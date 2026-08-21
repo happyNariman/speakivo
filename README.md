@@ -1,6 +1,6 @@
 # 🌍 Speakivo — AI Language Learning Companion
 
-Speakivo is an intelligent, conversational Telegram bot that helps you practice and learn any language through natural dialogue. Powered by the **OpenAI Agents SDK** and **GramIO**, Speakivo adapts to your learning pace, explains grammar, corrects mistakes, and introduces vocabulary in real-time.
+Speakivo is an intelligent, conversational Telegram bot that helps you practice and learn any language through natural dialogue. Powered by the **OpenAI Agents SDK**, **GramIO**, and **PostgreSQL with Drizzle ORM**, Speakivo adapts to your learning pace, explains grammar, corrects mistakes, tracks vocabulary progress, and remembers your learning history.
 
 ---
 
@@ -8,9 +8,11 @@ Speakivo is an intelligent, conversational Telegram bot that helps you practice 
 
 - 🌐 **Learn Any Language** — Practice German, Spanish, French, Japanese, English, or any language you choose without rigid presets.
 - 🤖 **Conversational AI Tutor** — Engaging dialogues, polite error corrections, concise grammar explanations, and context-aware follow-up questions.
-- ⚡ **Smart Token & Context Management** — Built-in BPE token counter (`o200k_base` / `cl100k_base`) ensures requests stay within configured limits and eliminates context overflows.
-- 🛡️ **Type-Safe & Robust** — Built with TypeScript, GramIO, and strict Zod runtime configuration validation.
-- 🐳 **Containerized** — Multi-stage Docker build ready for instant local testing or production deployment.
+- 🛠️ **Agentic Learning Tools** — Built-in AI tools for retrieving user profile, analyzing weak topics, reviewing vocabulary, and recording learning mistakes.
+- 💾 **Persistent Learning & Sessions** — PostgreSQL database powered by Drizzle ORM storing users, language levels, topics, vocabulary, mistake history, and chat sessions.
+- ⚡ **Smart Token & Context Management** — BPE token counter (`o200k_base` / `cl100k_base`) ensures requests stay within configured limits and eliminates context overflows.
+- 🛡️ **Type-Safe & Robust** — Built with TypeScript, GramIO, Drizzle ORM, and strict Zod runtime configuration validation.
+- 🐳 **Containerized** — Multi-stage Docker build with PostgreSQL service ready for instant local testing or production deployment.
 
 ---
 
@@ -41,16 +43,24 @@ Set your credentials in `.env`:
 ```env
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 OPENAI_API_KEY=your_openai_api_key
+DATABASE_URL=your_postgres_connection_string
 ```
 
-### 4. Run the Bot
+### 4. Database Setup (Migrations & Seed)
+
+```bash
+# Apply migrations to database
+npm run db:migrate
+
+# Seed initial languages and grammar topics
+npm run db:seed
+```
+
+### 5. Run the Bot
 
 **Using npm:**
 
 ```bash
-# Install dependencies
-npm install
-
 # Start in development mode (hot reload)
 npm run dev
 
@@ -96,6 +106,7 @@ All configuration is managed through environment variables and validated at star
 | --------------------------------------- | --------- | ----------------- | ---------------------------------------------------------------- |
 | `TELEGRAM_BOT_TOKEN`                    | `string`  | _required_        | Telegram Bot token from @BotFather                               |
 | `OPENAI_API_KEY`                        | `string`  | _required_        | OpenAI API key                                                   |
+| `DATABASE_URL`                          | `string`  | _required_        | PostgreSQL connection string                                     |
 | `OPENAI_MODEL`                          | `string`  | `gpt-5.6-luna`    | Model identifier (e.g., `gpt-5.6-luna`, `gpt-4o`, `gpt-4o-mini`) |
 | `AI_SHORT_CONTEXT_ENABLED`              | `boolean` | `true`            | Enable/disable input token budget enforcement                    |
 | `AI_SHORT_CONTEXT_MAX_INPUT_TOKENS`     | `number`  | `272000`          | Maximum allowed input tokens                                     |
@@ -104,30 +115,53 @@ All configuration is managed through environment variables and validated at star
 
 ---
 
+## 🗄️ Database Schema Overview
+
+The database uses **PostgreSQL** with **Drizzle ORM**:
+
+1. **`users`** — Internal user accounts with unique `telegram_id` mapping.
+2. **`languages`** — Reference table of supported languages (`en`, `ru`, `de`, `fr`, `es`, etc.).
+3. **`user_languages`** — User's enrolled language profiles with CEFR levels (`A1`-`C2`) and status.
+4. **`learning_topics`** — Grammar, vocabulary, and pronunciation topics per language.
+5. **`user_topic_progress`** — User mastery, attempts, confidence, and review scheduling per topic.
+6. **`vocabulary`** — Dictionary words and phrases per language with lemmas and parts of speech.
+7. **`user_vocabulary`** — User word repetitions, accuracy, and confidence metrics.
+8. **`learning_mistakes`** — Log of user mistakes with explanations and linked topics/vocab.
+9. **`learning_sessions`** — Learning sessions tracking user practice intervals.
+10. **`conversation_messages`** — History of user, assistant, system, and tool messages with token usage.
+
+---
+
 ## 🏗️ Architecture
 
 ```text
-Telegram User
-      ↓
-  GramIO (Long Polling)
-      ↓
-  Bot Handlers (src/bot/)
-      ↓
-  Agent Runner (src/agent/)
-      ↓
-┌────────────────────────────────────────────────────────┐
-│ Context Manager (src/ai/context/)                      │
-│ • BPE Token Counting (js-tiktoken)                     │
-│ • Budget Check (maxTokens - safetyMargin)              │
-│ • Truncate Oldest Strategy (preserves user prompt)     │
-│ • Observability & Metrics Logging                      │
-└────────────────────────────────────────────────────────┘
-      ↓ (Prepared Context)
-  OpenAI Agents SDK (@openai/agents)
-      ↓
-  Language Learning Tutor Agent
-      ↓
-  GramIO → Telegram User
+                         Telegram User
+                              │
+                            GramIO
+                              │
+                      Application Layer
+               (Find/Create User, Active Language)
+                              │
+                  ┌───────────┴───────────┐
+                  ▼                       ▼
+           Context Manager          User Context
+          (Recent Messages)      (User & Services)
+                  │                       │
+                  └───────────┬───────────┘
+                              ▼
+                   Language Learning Agent
+                              │
+                         Agent Tools
+             (Profile, Progress, Mistakes, Vocab)
+                              │
+                              ▼
+                     Application Services
+            (UserService, LearningService, ConversationService)
+                              │
+                           Drizzle
+                              │
+                              ▼
+                         PostgreSQL
 ```
 
 ---
@@ -138,7 +172,8 @@ Telegram User
 src/
 ├── agent/
 │   ├── instructions.ts          # Agent system prompt & personality
-│   └── language-agent.ts        # Agent definition & execution runner
+│   ├── language-agent.ts        # Agent definition & execution runner
+│   └── tools.ts                 # 8 database-backed Agent tools
 ├── ai/
 │   └── context/
 │       ├── types.ts             # Context management interfaces & metrics
@@ -149,18 +184,39 @@ src/
 ├── bot/
 │   ├── bot.ts                   # GramIO bot initialization & lifecycle
 │   └── handlers/
-│       └── message.ts           # Telegram message routing
+│       └── message.ts           # Telegram message routing & persistence
 ├── config/
 │   └── env.ts                   # Strongly-typed Zod environment configuration
+├── db/
+│   ├── client.ts                # Drizzle database client (postgres.js)
+│   ├── migrate.ts               # Migration runner
+│   ├── seed.ts                  # Deterministic database seeder
+│   └── schema/                  # 10 Drizzle database schema definitions
+│       ├── users.ts
+│       ├── languages.ts
+│       ├── user-languages.ts
+│       ├── learning-topics.ts
+│       ├── user-topic-progress.ts
+│       ├── vocabulary.ts
+│       ├── user-vocabulary.ts
+│       ├── learning-mistakes.ts
+│       ├── learning-sessions.ts
+│       ├── conversation-messages.ts
+│       └── index.ts
+├── services/
+│   ├── user-service.ts          # User finding, creation & sync
+│   ├── learning-service.ts      # Languages, progress, mistakes & vocabulary
+│   ├── conversation-service.ts  # Sessions & message history
+│   └── services.test.ts         # Service & database integration tests
 └── main.ts                      # Application entry point
 ```
 
 ---
 
-## 🛠️ Development & Testing
+## 🛠️ Development & Database Commands
 
 ```bash
-# Run unit tests
+# Run unit & integration tests
 npm test
 
 # Run TypeScript type check
@@ -168,6 +224,18 @@ npm run typecheck
 
 # Build for production
 npm run build
+
+# Generate Drizzle migrations
+npm run db:generate
+
+# Apply migrations
+npm run db:migrate
+
+# Seed database
+npm run db:seed
+
+# Open Drizzle Studio
+npm run db:studio
 ```
 
 ---

@@ -12,6 +12,11 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
   OPENAI_MODEL: z.string().default("gpt-5.6-luna"),
 
+  // Database (Stage 3)
+  DATABASE_URL: z
+    .string()
+    .min(1, "DATABASE_URL is required"),
+
   // AI Context Management (Stage 2)
   AI_SHORT_CONTEXT_ENABLED: z
     .string()

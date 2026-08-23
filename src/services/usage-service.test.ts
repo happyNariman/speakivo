@@ -304,19 +304,27 @@ describe("Stage 4 — AI Usage Tracking & Analytics", () => {
     it("recordAgentRunUsage should catch database errors and return empty array without throwing", async () => {
       const invalidUserId = randomUUID(); // Non-existent user will violate FK constraint
 
-      const records = await usageService.recordAgentRunUsage({
-        userId: invalidUserId,
-        model: "gpt-5.6-luna",
-        rawResponses: [
-          {
-            usage: new Usage({ input_tokens: 50, output_tokens: 10, total_tokens: 60 }),
-            output: [],
-          },
-        ],
-      });
+      // Temporarily silence console.error for expected DB failure in this test
+      const originalConsoleError = console.error;
+      console.error = () => {};
 
-      // Does not throw, returns empty array
-      assert.deepEqual(records, []);
+      try {
+        const records = await usageService.recordAgentRunUsage({
+          userId: invalidUserId,
+          model: "gpt-5.6-luna",
+          rawResponses: [
+            {
+              usage: new Usage({ input_tokens: 50, output_tokens: 10, total_tokens: 60 }),
+              output: [],
+            },
+          ],
+        });
+
+        // Does not throw, returns empty array
+        assert.deepEqual(records, []);
+      } finally {
+        console.error = originalConsoleError;
+      }
     });
   });
 });

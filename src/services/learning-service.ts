@@ -30,6 +30,19 @@ export class LearningService {
   constructor(private readonly database: Database = db) {}
 
   /**
+   * Retrieves a user language profile by its internal UUID.
+   */
+  async getUserLanguageById(userLanguageId: string): Promise<UserLanguage | null> {
+    const rows = await this.database
+      .select()
+      .from(userLanguages)
+      .where(eq(userLanguages.id, userLanguageId))
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
+  /**
    * Retrieves all language profiles for a user.
    */
   async getUserLanguages(userId: string): Promise<UserLanguage[]> {
@@ -113,16 +126,23 @@ export class LearningService {
   async getLearningProgress(userLanguageId: string): Promise<{
     topicsCount: number;
     masteredTopicsCount: number;
+    learningTopicsCount: number;
+    reviewTopicsCount: number;
     avgTopicConfidence: number;
     vocabularyCount: number;
     masteredVocabularyCount: number;
+    learningVocabularyCount: number;
+    reviewVocabularyCount: number;
     avgVocabularyConfidence: number;
     totalMistakesCount: number;
+    recentMistakesCount: number;
   }> {
     const topicStats = await this.database
       .select({
         count: sql<number>`count(*)::int`,
         mastered: sql<number>`count(case when ${userTopicProgress.status} = 'mastered' then 1 end)::int`,
+        learning: sql<number>`count(case when ${userTopicProgress.status} = 'learning' then 1 end)::int`,
+        review: sql<number>`count(case when ${userTopicProgress.status} = 'review' then 1 end)::int`,
         avgConfidence: sql<number>`coalesce(avg(${userTopicProgress.confidence}), 0)::real`,
       })
       .from(userTopicProgress)
@@ -132,6 +152,8 @@ export class LearningService {
       .select({
         count: sql<number>`count(*)::int`,
         mastered: sql<number>`count(case when ${userVocabulary.status} = 'mastered' then 1 end)::int`,
+        learning: sql<number>`count(case when ${userVocabulary.status} = 'learning' then 1 end)::int`,
+        review: sql<number>`count(case when ${userVocabulary.status} = 'review' then 1 end)::int`,
         avgConfidence: sql<number>`coalesce(avg(${userVocabulary.confidence}), 0)::real`,
       })
       .from(userVocabulary)
@@ -140,6 +162,7 @@ export class LearningService {
     const mistakeStats = await this.database
       .select({
         count: sql<number>`count(*)::int`,
+        recent: sql<number>`count(case when ${learningMistakes.createdAt} >= now() - interval '7 days' then 1 end)::int`,
       })
       .from(learningMistakes)
       .where(eq(learningMistakes.userLanguageId, userLanguageId));
@@ -147,11 +170,16 @@ export class LearningService {
     return {
       topicsCount: topicStats[0]?.count ?? 0,
       masteredTopicsCount: topicStats[0]?.mastered ?? 0,
+      learningTopicsCount: topicStats[0]?.learning ?? 0,
+      reviewTopicsCount: topicStats[0]?.review ?? 0,
       avgTopicConfidence: topicStats[0]?.avgConfidence ?? 0,
       vocabularyCount: vocabStats[0]?.count ?? 0,
       masteredVocabularyCount: vocabStats[0]?.mastered ?? 0,
+      learningVocabularyCount: vocabStats[0]?.learning ?? 0,
+      reviewVocabularyCount: vocabStats[0]?.review ?? 0,
       avgVocabularyConfidence: vocabStats[0]?.avgConfidence ?? 0,
       totalMistakesCount: mistakeStats[0]?.count ?? 0,
+      recentMistakesCount: mistakeStats[0]?.recent ?? 0,
     };
   }
 
@@ -235,7 +263,45 @@ export class LearningService {
   }
 
   /**
-   * Records a user language learning mistake.
+   * Retrieves recent meaningful mistakes made by the user in the active language profile.
+   */
+  async getRecentMistakes(
+    userLanguageId: string,
+    limit = 5,
+  ): Promise<
+    Array<{
+      id: string;
+      category: MistakeCategory;
+      sourceText: string;
+      correctedText: string | null;
+      explanation: string | null;
+      topicId: string | null;
+      vocabularyId: string | null;
+      createdAt: Date;
+    }>
+  > {
+    const effectiveLimit = Math.max(1, Math.min(10, limit));
+    const rows = await this.database
+      .select({
+        id: learningMistakes.id,
+        category: learningMistakes.category,
+        sourceText: learningMistakes.sourceText,
+        correctedText: learningMistakes.correctedText,
+        explanation: learningMistakes.explanation,
+        topicId: learningMistakes.topicId,
+        vocabularyId: learningMistakes.vocabularyId,
+        createdAt: learningMistakes.createdAt,
+      })
+      .from(learningMistakes)
+      .where(eq(learningMistakes.userLanguageId, userLanguageId))
+      .orderBy(desc(learningMistakes.createdAt))
+      .limit(effectiveLimit);
+
+    return rows;
+  }
+
+  /**
+   * Records a user language learning mistake with strict language boundary validation.
    */
   async recordMistake(data: {
     userLanguageId: string;
@@ -247,6 +313,47 @@ export class LearningService {
     vocabularyId?: string;
     severity?: "low" | "medium" | "high";
   }): Promise<LearningMistake> {
+    const userLang = await this.getUserLanguageById(data.userLanguageId);
+    if (!userLang) {
+      throw new Error(`User language profile ${data.userLanguageId} not found`);
+    }
+
+    // Language consistency: validate topic belongs to the same learning language
+    if (data.topicId) {
+      const [topic] = await this.database
+        .select()
+        .from(learningTopics)
+        .where(eq(learningTopics.id, data.topicId))
+        .limit(1);
+
+      if (!topic) {
+        throw new Error(`Topic with ID ${data.topicId} not found`);
+      }
+      if (topic.languageCode !== userLang.languageCode) {
+        throw new Error(
+          `Topic '${topic.name}' (${topic.languageCode}) does not belong to active language (${userLang.languageCode})`,
+        );
+      }
+    }
+
+    // Language consistency: validate vocabulary belongs to the same learning language
+    if (data.vocabularyId) {
+      const [vocab] = await this.database
+        .select()
+        .from(vocabulary)
+        .where(eq(vocabulary.id, data.vocabularyId))
+        .limit(1);
+
+      if (!vocab) {
+        throw new Error(`Vocabulary item with ID ${data.vocabularyId} not found`);
+      }
+      if (vocab.languageCode !== userLang.languageCode) {
+        throw new Error(
+          `Vocabulary '${vocab.lemma}' (${vocab.languageCode}) does not belong to active language (${userLang.languageCode})`,
+        );
+      }
+    }
+
     const [mistake] = await this.database
       .insert(learningMistakes)
       .values({
@@ -266,6 +373,7 @@ export class LearningService {
 
   /**
    * Saves a vocabulary word to the dictionary and links it to the user's vocabulary list.
+   * Prevents duplicates and strictly validates language consistency.
    */
   async saveVocabulary(data: {
     userLanguageId: string;
@@ -275,14 +383,23 @@ export class LearningService {
     translation?: string;
     partOfSpeech?: string;
   }): Promise<{ vocabulary: Vocabulary; userVocabulary: UserVocabulary }> {
+    const userLang = await this.getUserLanguageById(data.userLanguageId);
+    if (!userLang) {
+      throw new Error(`User language profile ${data.userLanguageId} not found`);
+    }
+
+    const targetLanguageCode = userLang.languageCode;
+    const normalizedLemma = data.lemma.trim().toLowerCase();
+    const normalizedWord = data.word.trim();
+
     // 1. Find or insert vocabulary
     const existingVocab = await this.database
       .select()
       .from(vocabulary)
       .where(
         and(
-          eq(vocabulary.languageCode, data.languageCode),
-          eq(vocabulary.lemma, data.lemma),
+          eq(vocabulary.languageCode, targetLanguageCode),
+          eq(vocabulary.lemma, normalizedLemma),
         ),
       )
       .limit(1);
@@ -294,17 +411,17 @@ export class LearningService {
       const [inserted] = await this.database
         .insert(vocabulary)
         .values({
-          languageCode: data.languageCode,
-          lemma: data.lemma,
-          word: data.word,
-          translation: data.translation ?? null,
-          partOfSpeech: data.partOfSpeech ?? null,
+          languageCode: targetLanguageCode,
+          lemma: normalizedLemma,
+          word: normalizedWord,
+          translation: data.translation?.trim() ?? null,
+          partOfSpeech: data.partOfSpeech?.trim() ?? null,
         })
         .returning();
       vocabItem = inserted;
     }
 
-    // 2. Link to user_vocabulary
+    // 2. Link to user_vocabulary (prevent duplicate records)
     const existingUserVocab = await this.database
       .select()
       .from(userVocabulary)
@@ -348,7 +465,7 @@ export class LearningService {
   }
 
   /**
-   * Updates topic progress for a user (attempts, correct attempts, confidence, status).
+   * Updates topic progress for a user with language validation and invariant checks.
    */
   async updateTopicProgress(data: {
     userLanguageId: string;
@@ -357,6 +474,27 @@ export class LearningService {
     isCorrect?: boolean;
     confidenceDelta?: number;
   }): Promise<UserTopicProgress> {
+    const userLang = await this.getUserLanguageById(data.userLanguageId);
+    if (!userLang) {
+      throw new Error(`User language profile ${data.userLanguageId} not found`);
+    }
+
+    // Validate topic existence and language consistency
+    const [topic] = await this.database
+      .select()
+      .from(learningTopics)
+      .where(eq(learningTopics.id, data.topicId))
+      .limit(1);
+
+    if (!topic) {
+      throw new Error(`Topic with ID ${data.topicId} not found`);
+    }
+    if (topic.languageCode !== userLang.languageCode) {
+      throw new Error(
+        `Topic '${topic.name}' (${topic.languageCode}) does not belong to active language (${userLang.languageCode})`,
+      );
+    }
+
     const existing = await this.database
       .select()
       .from(userTopicProgress)
@@ -374,7 +512,10 @@ export class LearningService {
     if (existing.length > 0) {
       const current = existing[0];
       const newAttempts = current.attempts + 1;
-      const newCorrect = current.correctAttempts + (isCorrect ? 1 : 0);
+      const newCorrect = Math.min(
+        newAttempts,
+        current.correctAttempts + (isCorrect ? 1 : 0),
+      );
       const newConfidence = Math.max(0, Math.min(1, current.confidence + delta));
       const newStatus =
         data.status ??
@@ -418,7 +559,7 @@ export class LearningService {
   }
 
   /**
-   * Updates vocabulary progress for a user (repetitions, correct count, confidence).
+   * Updates vocabulary progress for a user with language validation and invariant checks.
    */
   async updateVocabularyProgress(data: {
     userLanguageId: string;
@@ -427,6 +568,27 @@ export class LearningService {
     isCorrect?: boolean;
     confidenceDelta?: number;
   }): Promise<UserVocabulary> {
+    const userLang = await this.getUserLanguageById(data.userLanguageId);
+    if (!userLang) {
+      throw new Error(`User language profile ${data.userLanguageId} not found`);
+    }
+
+    // Validate vocabulary existence and language consistency
+    const [vocab] = await this.database
+      .select()
+      .from(vocabulary)
+      .where(eq(vocabulary.id, data.vocabularyId))
+      .limit(1);
+
+    if (!vocab) {
+      throw new Error(`Vocabulary item with ID ${data.vocabularyId} not found`);
+    }
+    if (vocab.languageCode !== userLang.languageCode) {
+      throw new Error(
+        `Vocabulary '${vocab.lemma}' (${vocab.languageCode}) does not belong to active language (${userLang.languageCode})`,
+      );
+    }
+
     const existing = await this.database
       .select()
       .from(userVocabulary)
@@ -444,7 +606,10 @@ export class LearningService {
     if (existing.length > 0) {
       const current = existing[0];
       const newTimesSeen = current.timesSeen + 1;
-      const newTimesCorrect = current.timesCorrect + (isCorrect ? 1 : 0);
+      const newTimesCorrect = Math.min(
+        newTimesSeen,
+        current.timesCorrect + (isCorrect ? 1 : 0),
+      );
       const newConfidence = Math.max(0, Math.min(1, current.confidence + delta));
       const newStatus =
         data.status ??

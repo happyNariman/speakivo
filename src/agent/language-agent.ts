@@ -6,7 +6,7 @@ import { ContextManager } from "../ai/context/context-manager.js";
 import type { AgentInput } from "../ai/context/types.js";
 import { agentTools } from "./tools.js";
 import type { UserService } from "../services/user-service.js";
-import type { LearningService } from "../services/learning-service.js";
+import type { LearningService, CEFRLevel } from "../services/learning-service.js";
 import type { ConversationService } from "../services/conversation-service.js";
 
 export interface AgentContext {
@@ -14,7 +14,7 @@ export interface AgentContext {
   telegramUserId: number;
   userLanguageId: string;
   languageCode: string;
-  level: string;
+  level: CEFRLevel;
   sessionId: string;
   userService: UserService;
   learningService: LearningService;

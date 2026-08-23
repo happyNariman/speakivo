@@ -11,14 +11,18 @@ import {
   userVocabulary,
 } from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
+import type { AgentContext } from "../agent/language-agent.js";
 
-describe("Stage 3 — Database & Domain Services", () => {
+describe("Stage 3 & 5 — Database, Domain Services & Safe Agent Tools", () => {
   const testTelegramId = 999000000 + Math.floor(Math.random() * 100000);
   let testUserId: string;
   let testUserLangId: string;
+  let testGermanLangId: string;
   let testSessionId: string;
-  let sampleTopicId: string;
+  let sampleEnglishTopicId: string;
+  let sampleGermanTopicId: string;
   let savedVocabId: string;
+  let sampleGermanVocabId: string;
 
   before(async () => {
     await db.delete(users).where(eq(users.telegramId, testTelegramId));
@@ -120,6 +124,7 @@ describe("Stage 3 — Database & Domain Services", () => {
       assert.ok(deLang.id);
       assert.notEqual(deLang.id, testUserLangId);
       assert.equal(deLang.languageCode, "de");
+      testGermanLangId = deLang.id;
 
       const allLangs = await learningService.getUserLanguages(testUserId);
       assert.ok(allLangs.length >= 2);
@@ -135,18 +140,26 @@ describe("Stage 3 — Database & Domain Services", () => {
   // --- LearningService: Topics & Progress ---
   describe("LearningService — Topics & Progress", () => {
     it("should fetch seeded topics and create topic progress", async () => {
-      const topics = await db
+      const enTopics = await db
         .select()
         .from(learningTopics)
         .where(eq(learningTopics.languageCode, "en"))
         .limit(1);
 
-      assert.ok(topics.length > 0, "Expected seeded English topics");
-      sampleTopicId = topics[0].id;
+      const deTopics = await db
+        .select()
+        .from(learningTopics)
+        .where(eq(learningTopics.languageCode, "de"))
+        .limit(1);
+
+      assert.ok(enTopics.length > 0, "Expected seeded English topics");
+      assert.ok(deTopics.length > 0, "Expected seeded German topics");
+      sampleEnglishTopicId = enTopics[0].id;
+      sampleGermanTopicId = deTopics[0].id;
 
       const progress = await learningService.updateTopicProgress({
         userLanguageId: testUserLangId,
-        topicId: sampleTopicId,
+        topicId: sampleEnglishTopicId,
         isCorrect: true,
       });
 
@@ -159,7 +172,7 @@ describe("Stage 3 — Database & Domain Services", () => {
     it("should update progress on subsequent practice", async () => {
       const progress = await learningService.updateTopicProgress({
         userLanguageId: testUserLangId,
-        topicId: sampleTopicId,
+        topicId: sampleEnglishTopicId,
         isCorrect: true,
       });
 
@@ -175,7 +188,7 @@ describe("Stage 3 — Database & Domain Services", () => {
       );
       assert.ok(Array.isArray(weakTopics));
       assert.ok(weakTopics.length > 0);
-      assert.equal(weakTopics[0].topicId, sampleTopicId);
+      assert.equal(weakTopics[0].topicId, sampleEnglishTopicId);
     });
   });
 
@@ -196,6 +209,16 @@ describe("Stage 3 — Database & Domain Services", () => {
       assert.equal(result.vocabulary.lemma, "wanderlust");
       assert.equal(result.userVocabulary.timesSeen, 1);
       savedVocabId = result.vocabulary.id;
+
+      // Seed German vocab lookup for cross-language check
+      const deVocabs = await db
+        .select()
+        .from(vocabulary)
+        .where(eq(vocabulary.languageCode, "de"))
+        .limit(1);
+      if (deVocabs.length > 0) {
+        sampleGermanVocabId = deVocabs[0].id;
+      }
     });
 
     it("should update vocabulary progress on practice", async () => {
@@ -218,10 +241,24 @@ describe("Stage 3 — Database & Domain Services", () => {
       assert.ok(Array.isArray(reviewList));
       assert.ok(reviewList.some((v) => v.vocabularyId === savedVocabId));
     });
+
+    it("should prevent duplicate vocabulary records when saving existing word", async () => {
+      const result = await learningService.saveVocabulary({
+        userLanguageId: testUserLangId,
+        languageCode: "en",
+        lemma: "wanderlust",
+        word: "wanderlust",
+      });
+
+      assert.equal(result.vocabulary.id, savedVocabId);
+      assert.equal(result.userVocabulary.timesSeen, 3); // incremented timesSeen
+    });
   });
 
-  // --- LearningService: Mistakes ---
-  describe("LearningService — Mistakes", () => {
+  // --- LearningService: Mistakes & Recent Mistakes ---
+  describe("LearningService — Mistakes & Recent Mistakes", () => {
+    let testMistakeId: string;
+
     it("should record a learning mistake with topic reference", async () => {
       const mistake = await learningService.recordMistake({
         userLanguageId: testUserLangId,
@@ -229,14 +266,15 @@ describe("Stage 3 — Database & Domain Services", () => {
         sourceText: "He go to school yesterday.",
         correctedText: "He went to school yesterday.",
         explanation: "Use past tense 'went' instead of present 'go'.",
-        topicId: sampleTopicId,
+        topicId: sampleEnglishTopicId,
         severity: "medium",
       });
 
       assert.ok(mistake.id);
       assert.equal(mistake.category, "grammar");
       assert.equal(mistake.sourceText, "He go to school yesterday.");
-      assert.equal(mistake.topicId, sampleTopicId);
+      assert.equal(mistake.topicId, sampleEnglishTopicId);
+      testMistakeId = mistake.id;
     });
 
     it("should record a mistake with nullable topic and vocabulary", async () => {
@@ -253,11 +291,67 @@ describe("Stage 3 — Database & Domain Services", () => {
       assert.equal(mistake.vocabularyId, null);
     });
 
+    it("should fetch recent mistakes ordered by creation date descending", async () => {
+      const recent = await learningService.getRecentMistakes(testUserLangId, 5);
+
+      assert.ok(Array.isArray(recent));
+      assert.ok(recent.length >= 2);
+      assert.equal(recent[0].category, "spelling"); // most recent first
+      assert.ok(recent.some((m) => m.id === testMistakeId));
+    });
+
     it("should aggregate overall learning progress statistics", async () => {
       const stats = await learningService.getLearningProgress(testUserLangId);
       assert.ok(stats.topicsCount >= 1);
       assert.ok(stats.vocabularyCount >= 1);
-      assert.ok(stats.totalMistakesCount >= 1);
+      assert.ok(stats.totalMistakesCount >= 2);
+    });
+  });
+
+  // --- Stage 5: Language Consistency & Ownership Invariants ---
+  describe("Stage 5 — Language Consistency & Domain Invariants", () => {
+    it("should reject updating topic progress for a topic from a different language", async () => {
+      await assert.rejects(
+        async () => {
+          // Attempting to update German topic progress under English user profile
+          await learningService.updateTopicProgress({
+            userLanguageId: testUserLangId, // English
+            topicId: sampleGermanTopicId, // German
+            isCorrect: true,
+          });
+        },
+        /does not belong to active language/,
+      );
+    });
+
+    it("should reject updating vocabulary progress for a vocabulary item from a different language", async () => {
+      if (sampleGermanVocabId) {
+        await assert.rejects(
+          async () => {
+            // Attempting to update German vocab progress under English profile
+            await learningService.updateVocabularyProgress({
+              userLanguageId: testUserLangId, // English
+              vocabularyId: sampleGermanVocabId, // German
+              isCorrect: true,
+            });
+          },
+          /does not belong to active language/,
+        );
+      }
+    });
+
+    it("should reject recording a mistake referencing a topic from a different language", async () => {
+      await assert.rejects(
+        async () => {
+          await learningService.recordMistake({
+            userLanguageId: testUserLangId, // English
+            category: "grammar",
+            sourceText: "Ich habe gegangen",
+            topicId: sampleGermanTopicId, // German topic on English profile
+          });
+        },
+        /does not belong to active language/,
+      );
     });
   });
 
@@ -306,7 +400,6 @@ describe("Stage 3 — Database & Domain Services", () => {
       );
 
       assert.equal(messages.length, 2);
-      // Chronological order: first user, then assistant
       assert.equal(messages[0].role, "user");
       assert.equal(messages[1].role, "assistant");
       assert.equal(messages[1].inputTokens, 120);
@@ -330,14 +423,15 @@ describe("Stage 3 — Database & Domain Services", () => {
     });
   });
 
-  // --- Agent tools structure ---
-  describe("Agent Tools Structure", () => {
-    it("all 8 tools should be properly defined as function tools", async () => {
+  // --- Agent Tools Structure & Compact Output ---
+  describe("Agent Tools Structure & Compact Payloads", () => {
+    it("all 9 tools should be properly defined as function tools", async () => {
       const {
         getUserProfileTool,
         getLearningProgressTool,
         getWeakTopicsTool,
         getVocabularyToReviewTool,
+        getRecentMistakesTool,
         recordLearningMistakeTool,
         saveVocabularyTool,
         updateTopicProgressTool,
@@ -345,26 +439,98 @@ describe("Stage 3 — Database & Domain Services", () => {
         agentTools,
       } = await import("../agent/tools.js");
 
-      // All 8 tools exist in the array
-      assert.equal(agentTools.length, 8);
+      // All 9 tools exist in the array (5 Read + 4 Write)
+      assert.equal(agentTools.length, 9);
 
-      // Each tool has correct type and structure
       const toolNames = agentTools.map((t) => t.name);
       assert.ok(toolNames.includes("get_user_profile"));
       assert.ok(toolNames.includes("get_learning_progress"));
       assert.ok(toolNames.includes("get_weak_topics"));
       assert.ok(toolNames.includes("get_vocabulary_to_review"));
+      assert.ok(toolNames.includes("get_recent_mistakes"));
       assert.ok(toolNames.includes("record_learning_mistake"));
       assert.ok(toolNames.includes("save_vocabulary"));
       assert.ok(toolNames.includes("update_topic_progress"));
       assert.ok(toolNames.includes("update_vocabulary_progress"));
 
-      // All are function tools with invoke method
       for (const t of agentTools) {
         assert.equal(t.type, "function");
         assert.equal(typeof t.invoke, "function");
         assert.ok(t.description, `Tool ${t.name} should have a description`);
       }
+    });
+
+    it("read tools should produce compact JSON payloads without raw DB metadata", async () => {
+      const { RunContext } = await import("@openai/agents");
+      const {
+        getUserProfileTool,
+        getLearningProgressTool,
+        getWeakTopicsTool,
+        getVocabularyToReviewTool,
+        getRecentMistakesTool,
+      } = await import("../agent/tools.js");
+
+      const mockCtx: AgentContext = {
+        userId: testUserId,
+        telegramUserId: testTelegramId,
+        userLanguageId: testUserLangId,
+        languageCode: "en",
+        level: "B1",
+        sessionId: testSessionId,
+        userService,
+        learningService,
+        conversationService,
+      };
+
+      const runCtx = new RunContext(mockCtx);
+
+      // 1. get_user_profile
+      const profileJson = (await getUserProfileTool.invoke(
+        runCtx,
+        "{}",
+      )) as string;
+      const profile = JSON.parse(profileJson);
+      assert.ok(profile.activeLanguage);
+      assert.equal(profile.activeLanguage.languageCode, "en");
+      assert.equal(profile.userId, undefined); // No internal userId leaked
+      assert.equal(profile.telegramUserId, undefined); // No Telegram ID leaked
+
+      // 2. get_learning_progress
+      const progressJson = (await getLearningProgressTool.invoke(
+        runCtx,
+        "{}",
+      )) as string;
+      const progress = JSON.parse(progressJson);
+      assert.equal(progress.languageCode, "en");
+      assert.ok(typeof progress.topics.total === "number");
+      assert.ok(typeof progress.topics.review === "number");
+      assert.ok(typeof progress.vocabulary.total === "number");
+      assert.ok(typeof progress.vocabulary.review === "number");
+      assert.ok(typeof progress.mistakes.recent === "number");
+
+      // 3. get_weak_topics
+      const weakJson = (await getWeakTopicsTool.invoke(
+        runCtx,
+        JSON.stringify({ limit: 5 }),
+      )) as string;
+      const weak = JSON.parse(weakJson);
+      assert.ok(Array.isArray(weak.topics));
+
+      // 4. get_vocabulary_to_review
+      const vocabJson = (await getVocabularyToReviewTool.invoke(
+        runCtx,
+        JSON.stringify({ limit: 5 }),
+      )) as string;
+      const vocab = JSON.parse(vocabJson);
+      assert.ok(Array.isArray(vocab.vocabulary));
+
+      // 5. get_recent_mistakes
+      const mistakesJson = (await getRecentMistakesTool.invoke(
+        runCtx,
+        JSON.stringify({ limit: 5 }),
+      )) as string;
+      const mistakes = JSON.parse(mistakesJson);
+      assert.ok(Array.isArray(mistakes.mistakes));
     });
   });
 });

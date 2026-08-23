@@ -13,7 +13,7 @@ import {
 import { eq } from "drizzle-orm";
 import type { AgentContext } from "../agent/language-agent.js";
 
-describe("Stage 3 & 5 — Database, Domain Services & Safe Agent Tools", () => {
+describe("Database, Domain Services & Safe Agent Tools", () => {
   const testTelegramId = 999000000 + Math.floor(Math.random() * 100000);
   let testUserId: string;
   let testUserLangId: string;
@@ -308,8 +308,8 @@ describe("Stage 3 & 5 — Database, Domain Services & Safe Agent Tools", () => {
     });
   });
 
-  // --- Stage 5: Language Consistency & Ownership Invariants ---
-  describe("Stage 5 — Language Consistency & Domain Invariants", () => {
+  // --- Language Consistency & Ownership Invariants ---
+  describe("Language Consistency & Domain Invariants", () => {
     it("should reject updating topic progress for a topic from a different language", async () => {
       await assert.rejects(
         async () => {
@@ -436,11 +436,13 @@ describe("Stage 3 & 5 — Database, Domain Services & Safe Agent Tools", () => {
         saveVocabularyTool,
         updateTopicProgressTool,
         updateVocabularyProgressTool,
+        assessLanguageLevelTool,
+        confirmLanguageLevelTool,
         agentTools,
       } = await import("../agent/tools.js");
 
-      // All 9 tools exist in the array (5 Read + 4 Write)
-      assert.equal(agentTools.length, 9);
+      // All 11 tools exist in the array (5 Read + 4 Learning Write + 2 Level Assessment)
+      assert.equal(agentTools.length, 11);
 
       const toolNames = agentTools.map((t) => t.name);
       assert.ok(toolNames.includes("get_user_profile"));
@@ -452,6 +454,8 @@ describe("Stage 3 & 5 — Database, Domain Services & Safe Agent Tools", () => {
       assert.ok(toolNames.includes("save_vocabulary"));
       assert.ok(toolNames.includes("update_topic_progress"));
       assert.ok(toolNames.includes("update_vocabulary_progress"));
+      assert.ok(toolNames.includes("assess_language_level"));
+      assert.ok(toolNames.includes("confirm_language_level"));
 
       for (const t of agentTools) {
         assert.equal(t.type, "function");
@@ -462,6 +466,7 @@ describe("Stage 3 & 5 — Database, Domain Services & Safe Agent Tools", () => {
 
     it("read tools should produce compact JSON payloads without raw DB metadata", async () => {
       const { RunContext } = await import("@openai/agents");
+      const { assessmentService } = await import("./assessment-service.js");
       const {
         getUserProfileTool,
         getLearningProgressTool,
@@ -480,6 +485,7 @@ describe("Stage 3 & 5 — Database, Domain Services & Safe Agent Tools", () => {
         userService,
         learningService,
         conversationService,
+        assessmentService,
       };
 
       const runCtx = new RunContext(mockCtx);

@@ -11,7 +11,7 @@ import { db, queryClient } from "../db/client.js";
 import { users } from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
 
-describe("Stage 4 — AI Usage Tracking & Analytics", () => {
+describe("AI Usage Tracking & Analytics", () => {
   const testTelegramId = 888000000 + Math.floor(Math.random() * 100000);
   let testUserId: string;
   let testSessionId: string;
@@ -274,7 +274,7 @@ describe("Stage 4 — AI Usage Tracking & Analytics", () => {
       for (let i = 0; i < records.length - 1; i++) {
         assert.ok(
           new Date(records[i].createdAt).getTime() >=
-            new Date(records[i + 1].createdAt).getTime(),
+          new Date(records[i + 1].createdAt).getTime(),
         );
       }
     });
@@ -306,7 +306,7 @@ describe("Stage 4 — AI Usage Tracking & Analytics", () => {
 
       // Temporarily silence console.error for expected DB failure in this test
       const originalConsoleError = console.error;
-      console.error = () => {};
+      console.error = () => { };
 
       try {
         const records = await usageService.recordAgentRunUsage({

@@ -8,6 +8,7 @@ import { agentTools } from "./tools.js";
 import type { UserService } from "../services/user-service.js";
 import type { LearningService, CEFRLevel } from "../services/learning-service.js";
 import type { ConversationService } from "../services/conversation-service.js";
+import type { AssessmentService } from "../services/assessment-service.js";
 
 export interface AgentContext {
   userId: string;
@@ -19,6 +20,7 @@ export interface AgentContext {
   userService: UserService;
   learningService: LearningService;
   conversationService: ConversationService;
+  assessmentService: AssessmentService;
 }
 
 export interface AgentRunResult {

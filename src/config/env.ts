@@ -12,12 +12,12 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
   OPENAI_MODEL: z.string().default("gpt-5.6-luna"),
 
-  // Database (Stage 3)
+  // Database
   DATABASE_URL: z
     .string()
     .min(1, "DATABASE_URL is required"),
 
-  // AI Context Management (Stage 2)
+  // AI Context Management
   AI_SHORT_CONTEXT_ENABLED: z
     .string()
     .default("true")
@@ -35,6 +35,22 @@ const envSchema = z.object({
   AI_SHORT_CONTEXT_STRATEGY: z
     .enum(["truncate_oldest"])
     .default("truncate_oldest"),
+
+  // Language Level Assessment
+  LANGUAGE_LEVEL_ASSESSMENT_ENABLED: z
+    .string()
+    .default("true")
+    .transform((val) => val === "true"),
+  LANGUAGE_LEVEL_MIN_CONFIDENCE: z.coerce
+    .number()
+    .min(0)
+    .max(1)
+    .default(0.75),
+  LANGUAGE_LEVEL_MIN_EVIDENCE: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(5),
 });
 
 function validateEnv(): z.infer<typeof envSchema> {

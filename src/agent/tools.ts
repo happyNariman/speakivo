@@ -1,5 +1,6 @@
 import { tool } from "@openai/agents";
 import { z } from "zod/v4";
+import { env } from "../config/env.js";
 import type { AgentContext } from "./language-agent.js";
 
 // ============================================================================
@@ -12,7 +13,7 @@ import type { AgentContext } from "./language-agent.js";
 export const getUserProfileTool = tool({
   name: "get_user_profile",
   description:
-    "Get the user's active learning language, level, and available language profiles.",
+    "Get the user's active learning language, level, level source, and available language profiles.",
   parameters: z.object({}),
   execute: async (_args, runContext) => {
     const ctx = runContext?.context as AgentContext | undefined;
@@ -22,15 +23,20 @@ export const getUserProfileTool = tool({
 
     try {
       const languages = await ctx.learningService.getUserLanguages(ctx.userId);
+      const activeProfile = languages.find(
+        (l) => l.languageCode === ctx.languageCode,
+      );
 
       return JSON.stringify({
         activeLanguage: {
           languageCode: ctx.languageCode,
           level: ctx.level,
+          levelSource: activeProfile?.levelSource ?? "default",
         },
         languages: languages.map((l) => ({
           languageCode: l.languageCode,
           level: l.level,
+          levelSource: l.levelSource,
           status: l.status,
         })),
       });
@@ -242,7 +248,7 @@ export const getRecentMistakesTool = tool({
 });
 
 // ============================================================================
-// STATE-CHANGING / WRITE TOOLS (Only after concrete learning events / exercises)
+// STATE-CHANGING / LEARNING WRITE TOOLS
 // ============================================================================
 
 /**
@@ -450,7 +456,120 @@ export const updateVocabularyProgressTool = tool({
   },
 });
 
-// All 9 tools exported for Language Learning Agent
+// ============================================================================
+// DYNAMIC LEVEL ASSESSMENT TOOLS
+// ============================================================================
+
+/**
+ * 10. assess_language_level: Creates a CEFR level assessment proposal based on evidence.
+ */
+export const assessLanguageLevelTool = tool({
+  name: "assess_language_level",
+  description:
+    "Create a CEFR level assessment proposal based on observed evidence. Does not mutate persisted level until confirmed.",
+  parameters: z.object({
+    proposedLevel: z
+      .enum(["A1", "A2", "B1", "B2", "C1", "C2"])
+      .describe("The newly estimated CEFR level"),
+    confidence: z
+      .number()
+      .min(env.LANGUAGE_LEVEL_MIN_CONFIDENCE)
+      .max(1)
+      .describe(
+        `Confidence score between ${env.LANGUAGE_LEVEL_MIN_CONFIDENCE} and 1.0`,
+      ),
+    evidence: z
+      .array(z.string())
+      .min(env.LANGUAGE_LEVEL_MIN_EVIDENCE)
+      .describe(
+        `List of concrete observed evidence points across grammar, vocabulary, fluency (minimum ${env.LANGUAGE_LEVEL_MIN_EVIDENCE} items)`,
+      ),
+    reason: z
+      .string()
+      .min(1)
+      .describe("Summary justification for the proposed level assessment"),
+  }),
+  execute: async (args, runContext) => {
+    const ctx = runContext?.context as AgentContext | undefined;
+    if (!ctx) {
+      return JSON.stringify({ error: "Missing agent context" });
+    }
+
+    try {
+      const assessment = await ctx.assessmentService.createAssessment({
+        userLanguageId: ctx.userLanguageId,
+        proposedLevel: args.proposedLevel,
+        confidence: args.confidence,
+        evidence: args.evidence,
+        reason: args.reason,
+      });
+
+      return JSON.stringify({
+        success: true,
+        assessmentId: assessment.id,
+        proposedLevel: assessment.proposedLevel,
+        previousLevel: assessment.previousLevel,
+        confidence: Number(assessment.confidence.toFixed(2)),
+        evidence: assessment.evidence,
+        reason: assessment.reason,
+        status: assessment.status,
+      });
+    } catch (error) {
+      return JSON.stringify({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to assess language level",
+      });
+    }
+  },
+});
+
+/**
+ * 11. confirm_language_level: Atomically persists a proposed level after explicit user confirmation.
+ */
+export const confirmLanguageLevelTool = tool({
+  name: "confirm_language_level",
+  description:
+    "Persist a proposed language level after explicit user confirmation. Call only after the user agreed.",
+  parameters: z.object({
+    assessmentId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe(
+        "Assessment ID if known, or omit to confirm the latest pending assessment",
+      ),
+  }),
+  execute: async (args, runContext) => {
+    const ctx = runContext?.context as AgentContext | undefined;
+    if (!ctx) {
+      return JSON.stringify({ error: "Missing agent context" });
+    }
+
+    try {
+      const result = await ctx.assessmentService.confirmAssessment({
+        userLanguageId: ctx.userLanguageId,
+        assessmentId: args.assessmentId,
+      });
+
+      return JSON.stringify({
+        success: true,
+        newLevel: result.userLanguage.level,
+        status: "confirmed",
+      });
+    } catch (error) {
+      return JSON.stringify({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to confirm language level",
+      });
+    }
+  },
+});
+
+// All 11 tools exported for Language Learning Agent
 export const agentTools = [
   // 5 Read tools
   getUserProfileTool,
@@ -458,9 +577,12 @@ export const agentTools = [
   getWeakTopicsTool,
   getVocabularyToReviewTool,
   getRecentMistakesTool,
-  // 4 Write tools
+  // 4 Learning Write tools
   recordLearningMistakeTool,
   saveVocabularyTool,
   updateTopicProgressTool,
   updateVocabularyProgressTool,
+  // 2 Level Assessment tools
+  assessLanguageLevelTool,
+  confirmLanguageLevelTool,
 ];

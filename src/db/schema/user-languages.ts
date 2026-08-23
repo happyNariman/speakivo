@@ -19,6 +19,11 @@ export const userLanguages = pgTable(
     level: text("level", { enum: ["A1", "A2", "B1", "B2", "C1", "C2"] })
       .notNull()
       .default("A1"),
+    levelSource: text("level_source", {
+      enum: ["default", "self_reported", "assessed", "confirmed"],
+    })
+      .notNull()
+      .default("default"),
     status: text("status", { enum: ["active", "paused", "completed"] })
       .notNull()
       .default("active"),

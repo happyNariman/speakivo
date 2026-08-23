@@ -10,6 +10,7 @@ import { userService } from "../../services/user-service.js";
 import { learningService } from "../../services/learning-service.js";
 import { conversationService } from "../../services/conversation-service.js";
 import { usageService } from "../../services/usage-service.js";
+import { assessmentService } from "../../services/assessment-service.js";
 
 /**
  * Simple language keyword detection for automatic active profile switching.
@@ -140,12 +141,13 @@ export function registerMessageHandler(bot: Bot): void {
         userService,
         learningService,
         conversationService,
+        assessmentService,
       };
 
       // 9. Execute Language Learning Agent with Context Manager + Tools
       const agentResult = await runLanguageAgent(historyItems, agentContext);
 
-      // 10. Record actual post-request AI usage metrics (Stage 4)
+      // 10. Record actual post-request AI usage metrics
       // Isolated try-catch: usage persistence must never block a successful user interaction
       try {
         await usageService.recordAgentRunUsage({

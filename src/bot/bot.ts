@@ -1,4 +1,5 @@
 import { Bot } from "gramio";
+import { markdownToFormattable } from "@gramio/format/markdown";
 import { env } from "../config/env.js";
 import { registerMessageHandler } from "./handlers/message.js";
 import { userService } from "../services/user-service.js";
@@ -27,11 +28,20 @@ export function createBot(): Bot {
         }
       }
 
-      return context.send(
-        "Hi! I'm your language-learning tutor. 🌍\n\n" +
-          "Tell me which language you'd like to learn and I'll help you practice it.\n\n" +
-          'For example:\n"I want to learn English."\n"I want to learn German."\n"I want to learn Japanese."',
-      );
+      const welcomeMessage =
+        "👋 **Hi! I'm your language-learning tutor.** 🌍\n\n" +
+        "Tell me which language you'd like to learn and I'll help you practice it!\n\n" +
+        "💡 *For example:*\n" +
+        '- `"I want to learn English"`\n' +
+        '- `"I want to learn German"`\n' +
+        '- `"I want to learn Spanish"`\n' +
+        '- `"I want to learn Japanese"`';
+
+      try {
+        return await context.send(markdownToFormattable(welcomeMessage));
+      } catch {
+        return await context.send(welcomeMessage);
+      }
     })
     .onStart(({ info }) => {
       console.log(`[bot] @${info.username} started (long polling)`);

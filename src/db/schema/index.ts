@@ -8,3 +8,4 @@ export * from "./user-vocabulary.js";
 export * from "./learning-mistakes.js";
 export * from "./learning-sessions.js";
 export * from "./conversation-messages.js";
+export * from "./ai-usage.js";

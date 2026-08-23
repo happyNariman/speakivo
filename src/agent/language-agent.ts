@@ -1,4 +1,5 @@
-import { Agent, run } from "@openai/agents";
+import { randomUUID } from "node:crypto";
+import { Agent, run, type ModelResponse } from "@openai/agents";
 import { env } from "../config/env.js";
 import { LANGUAGE_TUTOR_INSTRUCTIONS } from "./instructions.js";
 import { ContextManager } from "../ai/context/context-manager.js";
@@ -24,6 +25,8 @@ export interface AgentRunResult {
   response: string;
   inputTokens: number | null;
   outputTokens: number | null;
+  runId: string;
+  rawResponses: ModelResponse[];
 }
 
 export const languageAgent = new Agent<AgentContext>({
@@ -45,8 +48,10 @@ export async function runLanguageAgent(
   input: AgentInput,
   context: AgentContext,
 ): Promise<AgentRunResult> {
+  const runId = randomUUID();
+
   console.log(
-    `[agent] execution started | userId=${context.userId} language=${context.languageCode} level=${context.level}`,
+    `[agent] execution started | runId=${runId} userId=${context.userId} language=${context.languageCode} level=${context.level}`,
   );
 
   // 1. Context management: check and enforce token budget before agent execution
@@ -58,12 +63,13 @@ export async function runLanguageAgent(
   // 2. Execute Agent with OpenAI Agents SDK
   const result = await run(languageAgent, contextResult.input, { context });
 
-  // 3. Extract token usage if available from raw LLM responses
+  // 3. Extract aggregate token usage if available from raw LLM responses
   let inputTokens: number | null = null;
   let outputTokens: number | null = null;
+  const rawResponses: ModelResponse[] = result.rawResponses ?? [];
 
-  if (result.rawResponses && result.rawResponses.length > 0) {
-    for (const raw of result.rawResponses) {
+  if (rawResponses.length > 0) {
+    for (const raw of rawResponses) {
       if (raw.usage) {
         inputTokens = (inputTokens ?? 0) + (raw.usage.inputTokens ?? 0);
         outputTokens = (outputTokens ?? 0) + (raw.usage.outputTokens ?? 0);
@@ -72,7 +78,8 @@ export async function runLanguageAgent(
   }
 
   console.log(
-    `[agent] execution completed | userId=${context.userId} inputTokens=${inputTokens ?? "N/A"} outputTokens=${outputTokens ?? "N/A"}`,
+    `[agent] execution completed | runId=${runId} userId=${context.userId} ` +
+      `rawRequests=${rawResponses.length} inputTokens=${inputTokens ?? "N/A"} outputTokens=${outputTokens ?? "N/A"}`,
   );
 
   const responseText =
@@ -84,5 +91,7 @@ export async function runLanguageAgent(
     response: responseText,
     inputTokens,
     outputTokens,
+    runId,
+    rawResponses,
   };
 }

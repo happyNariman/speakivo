@@ -1,5 +1,7 @@
 import type { Bot } from "gramio";
 import type { AgentInputItem } from "@openai/agents";
+import { markdownToFormattable } from "@gramio/format/markdown";
+import { env } from "../../config/env.js";
 import {
   runLanguageAgent,
   type AgentContext,
@@ -7,6 +9,7 @@ import {
 import { userService } from "../../services/user-service.js";
 import { learningService } from "../../services/learning-service.js";
 import { conversationService } from "../../services/conversation-service.js";
+import { usageService } from "../../services/usage-service.js";
 
 /**
  * Simple language keyword detection for automatic active profile switching.
@@ -119,7 +122,7 @@ export function registerMessageHandler(bot: Bot): void {
       });
 
       // 7. Save user message to database
-      await conversationService.saveMessage({
+      const userMsg = await conversationService.saveMessage({
         sessionId: session.id,
         role: "user",
         content: text,
@@ -142,7 +145,27 @@ export function registerMessageHandler(bot: Bot): void {
       // 9. Execute Language Learning Agent with Context Manager + Tools
       const agentResult = await runLanguageAgent(historyItems, agentContext);
 
-      // 10. Save assistant response and token counts to database
+      // 10. Record actual post-request AI usage metrics (Stage 4)
+      // Isolated try-catch: usage persistence must never block a successful user interaction
+      try {
+        await usageService.recordAgentRunUsage({
+          userId: user.id,
+          sessionId: session.id,
+          messageId: userMsg.id,
+          runId: agentResult.runId,
+          model: env.OPENAI_MODEL,
+          provider: "openai",
+          operation: "agent_response",
+          rawResponses: agentResult.rawResponses,
+        });
+      } catch (usageError) {
+        console.error(
+          "[handler] AI usage recording failed (non-fatal):",
+          usageError,
+        );
+      }
+
+      // 11. Save assistant response and token counts to database
       await conversationService.saveMessage({
         sessionId: session.id,
         role: "assistant",
@@ -152,8 +175,16 @@ export function registerMessageHandler(bot: Bot): void {
         outputTokens: agentResult.outputTokens,
       });
 
-      // 11. Send response back to user
-      await context.send(agentResult.response);
+      // 12. Send formatted Markdown response back to user
+      try {
+        await context.send(markdownToFormattable(agentResult.response));
+      } catch (sendErr) {
+        console.warn(
+          "[handler] Markdown send failed, falling back to plain text:",
+          sendErr,
+        );
+        await context.send(agentResult.response);
+      }
     } catch (error) {
       console.error("[handler] error processing message:", error);
       await context.send("Sorry, something went wrong. Please try again.");

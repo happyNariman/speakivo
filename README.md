@@ -10,6 +10,7 @@ Speakivo is an intelligent, conversational Telegram bot that helps you practice 
 - 🤖 **Conversational AI Tutor** — Engaging dialogues, polite error corrections, concise grammar explanations, and context-aware follow-up questions.
 - 🛠️ **Agentic Learning Tools** — Built-in AI tools for retrieving user profile, analyzing weak topics, reviewing vocabulary, and recording learning mistakes.
 - 💾 **Persistent Learning & Sessions** — PostgreSQL database powered by Drizzle ORM storing users, language levels, topics, vocabulary, mistake history, and chat sessions.
+- 📊 **Granular AI Usage Tracking** — Dedicated analytics layer recording per-request LLM tokens (input, output, cached, modality) independently from conversation messages.
 - ⚡ **Smart Token & Context Management** — BPE token counter (`o200k_base` / `cl100k_base`) ensures requests stay within configured limits and eliminates context overflows.
 - 🛡️ **Type-Safe & Robust** — Built with TypeScript, GramIO, Drizzle ORM, and strict Zod runtime configuration validation.
 - 🐳 **Containerized** — Multi-stage Docker build with PostgreSQL service ready for instant local testing or production deployment.
@@ -115,6 +116,20 @@ All configuration is managed through environment variables and validated at star
 
 ---
 
+## 📊 AI Usage Tracking & Analytics
+
+Speakivo includes a dedicated, model-agnostic AI usage layer to track resource consumption per model request:
+
+- **Separation of Concerns**: `conversation_messages` stores *what* was communicated; `ai_usage` stores *how many tokens/resources* were consumed.
+- **Per-Request Granularity**: If a single user message triggers multiple LLM requests (e.g., calling tools then responding), each request is logged as a separate row in `ai_usage`, correlated by `run_id`.
+- **Pre-Request Estimate vs. Post-Request Actuals**:
+  - Pre-request token counting (`ContextManager`) verifies that the prompt fits within the context budget before calling the API.
+  - Post-request usage (`UsageService`) captures actual billed tokens (including cached tokens, text tokens, audio tokens) returned by the provider.
+- **Voice-Ready**: Supports modality fields (`input_modality`, `output_modality`) and operations (`agent_response`, `speech_to_text`, `text_to_speech`, `realtime`) for seamless future audio support.
+- **Resilient**: Analytics recording failures are caught and logged safely without disrupting the user's conversational experience.
+
+---
+
 ## 🗄️ Database Schema Overview
 
 The database uses **PostgreSQL** with **Drizzle ORM**:
@@ -128,7 +143,8 @@ The database uses **PostgreSQL** with **Drizzle ORM**:
 7. **`user_vocabulary`** — User word repetitions, accuracy, and confidence metrics.
 8. **`learning_mistakes`** — Log of user mistakes with explanations and linked topics/vocab.
 9. **`learning_sessions`** — Learning sessions tracking user practice intervals.
-10. **`conversation_messages`** — History of user, assistant, system, and tool messages with token usage.
+10. **`conversation_messages`** — History of user, assistant, system, and tool messages.
+11. **`ai_usage`** — Per-request AI resource metrics (input/output/cached tokens, modality, model, run correlation).
 
 ---
 
@@ -145,23 +161,29 @@ The database uses **PostgreSQL** with **Drizzle ORM**:
                   ┌───────────┴───────────┐
                   ▼                       ▼
            Context Manager          User Context
-          (Recent Messages)      (User & Services)
+          (Pre-request Check)    (User & Services)
                   │                       │
                   └───────────┬───────────┘
                               ▼
                    Language Learning Agent
                               │
-                         Agent Tools
-             (Profile, Progress, Mistakes, Vocab)
-                              │
-                              ▼
-                     Application Services
-            (UserService, LearningService, ConversationService)
-                              │
-                           Drizzle
-                              │
-                              ▼
-                         PostgreSQL
+                    ┌─────────┴─────────┐
+                    ▼                   ▼
+               Agent Tools          OpenAI API
+           (Learning Services)          │
+                                        ▼
+                                  Model Responses
+                                  (Actual Usage)
+                                        │
+                                        ▼
+                                   UsageService
+                                        │
+                                        ▼
+                                    PostgreSQL
+                        ┌───────────────┴───────────────┐
+                        │                               │
+                 learning data                      ai_usage
+                 conversations                     analytics
 ```
 
 ---
@@ -172,7 +194,7 @@ The database uses **PostgreSQL** with **Drizzle ORM**:
 src/
 ├── agent/
 │   ├── instructions.ts          # Agent system prompt & personality
-│   ├── language-agent.ts        # Agent definition & execution runner
+│   ├── language-agent.ts        # Agent definition, runner & runId generator
 │   └── tools.ts                 # 8 database-backed Agent tools
 ├── ai/
 │   └── context/
@@ -184,14 +206,14 @@ src/
 ├── bot/
 │   ├── bot.ts                   # GramIO bot initialization & lifecycle
 │   └── handlers/
-│       └── message.ts           # Telegram message routing & persistence
+│       └── message.ts           # Telegram routing, persistence & usage recording
 ├── config/
 │   └── env.ts                   # Strongly-typed Zod environment configuration
 ├── db/
 │   ├── client.ts                # Drizzle database client (postgres.js)
 │   ├── migrate.ts               # Migration runner
 │   ├── seed.ts                  # Deterministic database seeder
-│   └── schema/                  # 10 Drizzle database schema definitions
+│   └── schema/                  # 11 Drizzle database schema definitions
 │       ├── users.ts
 │       ├── languages.ts
 │       ├── user-languages.ts
@@ -202,12 +224,15 @@ src/
 │       ├── learning-mistakes.ts
 │       ├── learning-sessions.ts
 │       ├── conversation-messages.ts
+│       ├── ai-usage.ts          # AI usage tracking table
 │       └── index.ts
 ├── services/
 │   ├── user-service.ts          # User finding, creation & sync
 │   ├── learning-service.ts      # Languages, progress, mistakes & vocabulary
 │   ├── conversation-service.ts  # Sessions & message history
-│   └── services.test.ts         # Service & database integration tests
+│   ├── usage-service.ts         # Per-request AI usage recording & analytics queries
+│   ├── services.test.ts         # Service & database integration tests
+│   └── usage-service.test.ts    # AI usage & analytics test suite
 └── main.ts                      # Application entry point
 ```
 

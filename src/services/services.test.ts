@@ -1,16 +1,16 @@
-import { describe, it, after } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { userService } from "./user-service.js";
 import { learningService } from "./learning-service.js";
 import { conversationService } from "./conversation-service.js";
 import { db, queryClient } from "../db/client.js";
-import { learningTopics } from "../db/schema/index.js";
+import {
+  learningTopics,
+  users,
+  vocabulary,
+  userVocabulary,
+} from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
-
-// Close the DB connection pool after all tests complete
-after(async () => {
-  await queryClient.end();
-});
 
 describe("Stage 3 — Database & Domain Services", () => {
   const testTelegramId = 999000000 + Math.floor(Math.random() * 100000);
@@ -19,6 +19,29 @@ describe("Stage 3 — Database & Domain Services", () => {
   let testSessionId: string;
   let sampleTopicId: string;
   let savedVocabId: string;
+
+  before(async () => {
+    await db.delete(users).where(eq(users.telegramId, testTelegramId));
+  });
+
+  // Clean up test data and close DB connection pool after suite
+  after(async () => {
+    try {
+      if (testUserId) {
+        await db.delete(users).where(eq(users.id, testUserId));
+      }
+      if (savedVocabId) {
+        await db
+          .delete(userVocabulary)
+          .where(eq(userVocabulary.vocabularyId, savedVocabId));
+        await db.delete(vocabulary).where(eq(vocabulary.id, savedVocabId));
+      }
+    } catch (err) {
+      console.error("[test cleanup error]", err);
+    } finally {
+      await queryClient.end();
+    }
+  });
 
   // --- UserService ---
   describe("UserService", () => {

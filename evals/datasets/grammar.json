@@ -1,0 +1,266 @@
+[
+  {
+    "id": "grammar-001-past-simple-go",
+    "name": "Past Simple error: 'I go yesterday'",
+    "category": "grammar",
+    "input": "Yesterday I go to the cinema with my friends.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake",
+            "arguments": {
+              "category": "grammar"
+            },
+            "argumentSubstrings": {
+              "sourceText": "go"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded",
+          "details": {
+            "category": "grammar"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["went"],
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "grammar-002-third-person-s",
+    "name": "Third person singular missing -s",
+    "category": "grammar",
+    "input": "My brother live in Berlin and he work as an engineer.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake",
+            "arguments": {
+              "category": "grammar"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded",
+          "details": {
+            "category": "grammar"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "grammar-003-irregular-verb-buyed",
+    "name": "Irregular past tense: 'buyed' instead of 'bought'",
+    "category": "grammar",
+    "input": "Last week I buyed a new laptop online.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake",
+            "arguments": {
+              "category": "grammar"
+            },
+            "argumentSubstrings": {
+              "sourceText": "buyed"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded",
+          "details": {
+            "category": "grammar"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["bought"],
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "grammar-004-correct-sentence-no-mistake",
+    "name": "Correct sentence: no mistake should be recorded",
+    "category": "grammar",
+    "input": "Yesterday I went to the supermarket and bought some fresh apples.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": ["record_learning_mistake"]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_not_recorded"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "grammar-005-irregular-plural-mans",
+    "name": "Irregular plural: 'mans' instead of 'men'",
+    "category": "grammar",
+    "input": "I saw three mans waiting near the bus station.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake"
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["men"],
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "grammar-006-preposition-arrive-to",
+    "name": "Preposition error: 'arrive to' instead of 'arrive in/at'",
+    "category": "grammar",
+    "input": "We will arrive to London tomorrow morning at 9 AM.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake"
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["in"],
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "grammar-007-double-negative",
+    "name": "Double negative error: 'don't know nothing'",
+    "category": "grammar",
+    "input": "I don't know nothing about that project.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake"
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["anything"],
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "grammar-008-conditional-practice",
+    "name": "Second conditional sentence formation",
+    "category": "grammar",
+    "input": "If I have more money, I would travel around the world.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake",
+            "arguments": {
+              "category": "grammar"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded",
+          "details": {
+            "category": "grammar"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["had"],
+        "noRawIds": true
+      }
+    }
+  }
+]

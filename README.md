@@ -9,6 +9,8 @@ Speakivo is an intelligent, conversational Telegram bot that helps you practice 
 - 🌐 **Learn Any Language** — Practice German, Spanish, French, Japanese, English, or any language you choose without rigid presets.
 - 🤖 **Conversational AI Tutor** — Engaging dialogues, polite error corrections, concise grammar explanations, and context-aware follow-up questions.
 - 🛠️ **Agentic Learning Tools** — Built-in AI tools for retrieving user profile, analyzing weak topics, reviewing vocabulary, and recording learning mistakes.
+- 📈 **Dynamic CEFR Level Assessment** — Multi-dimensional diagnostic evaluation, confidence scoring, evidence collection, and atomic confirmation to keep learner proficiency up-to-date.
+- 🧪 **Agent Evaluation Framework (Evals)** — Local, deterministic test suite measuring tool selection, argument accuracy, database side effects, security invariants, and token efficiency.
 - 💾 **Persistent Learning & Sessions** — PostgreSQL database powered by Drizzle ORM storing users, language levels, topics, vocabulary, mistake history, and chat sessions.
 - 📊 **Granular AI Usage Tracking** — Dedicated analytics layer recording per-request LLM tokens (input, output, cached, modality) independently from conversation messages.
 - ⚡ **Smart Token & Context Management** — BPE token counter (`o200k_base` / `cl100k_base`) ensures requests stay within configured limits and eliminates context overflows.
@@ -78,6 +80,52 @@ docker compose up --build
 
 ---
 
+## 🧪 Agent Evaluation Framework (Evals)
+
+Speakivo features a dedicated local evaluation system (`evals/`) designed to measure AI Agent quality, verify tool behavior, test database side effects, and prevent prompt regressions across **44 declarative scenarios** without relying on an LLM-as-a-judge.
+
+### Why Evals?
+
+1. **Safe Prompt Iteration** — Modify instructions and instantly verify that the Agent still calls required learning tools on errors.
+2. **Database Side-Effect Verification** — Asserts that actual PostgreSQL rows (`learning_mistakes`, `user_vocabulary`, `user_topic_progress`, `user_languages`) are inserted or updated correctly.
+3. **Security & Prompt Injection Testing** — Continuously asserts that unauthorized level updates, cross-user operations, and prompt injection attempts are blocked.
+4. **Token & Efficiency Monitoring** — Measures request count and token consumption per scenario to prevent tool overuse.
+5. **Zero Production Impact** — Each evaluation case executes with an isolated, ephemeral test user and self-cleans immediately upon completion.
+
+### Evaluation Datasets
+
+```text
+evals/datasets/
+├── conversation.json        # 6 cases: casual chit-chat (asserts NO write tools are called)
+├── grammar.json             # 8 cases: tenses, 3rd person -s, irregulars, prepositions, double negatives
+├── vocabulary.json          # 7 cases: word definitions, saving vocabulary, practice, false friends
+├── learning-state.json      # 7 cases: profile queries, progress stats, weak topics, practice updates
+├── level-assessment.json    # 6 cases: diagnostic testing, proposals, atomic confirmations, ambiguities
+├── security.json            # 7 cases: cross-user isolation, prompt injection, unauthorized claims
+└── context-budget.json      # 3 cases: multi-turn efficiency, medium text, context budget limits
+```
+
+### Running Evaluations
+
+```bash
+# Run all 44 evaluation cases
+npm run eval
+
+# Run category-specific evaluation suites
+npm run eval:conversation
+npm run eval:grammar
+npm run eval:vocabulary
+npm run eval:learning-state
+npm run eval:level-assessment
+npm run eval:security
+npm run eval:context-budget
+
+# Filter by a specific case ID
+npm run eval -- --case grammar-001-past-simple-go
+```
+
+---
+
 ## 💬 Example Conversation
 
 ```text
@@ -113,6 +161,9 @@ All configuration is managed through environment variables and validated at star
 | `AI_SHORT_CONTEXT_MAX_INPUT_TOKENS`     | `number`  | `272000`          | Maximum allowed input tokens                                     |
 | `AI_SHORT_CONTEXT_SAFETY_MARGIN_TOKENS` | `number`  | `5000`            | Safety margin subtracted from max tokens                         |
 | `AI_SHORT_CONTEXT_STRATEGY`             | `string`  | `truncate_oldest` | Context reduction strategy when exceeding budget                 |
+| `LANGUAGE_LEVEL_ASSESSMENT_ENABLED`     | `boolean` | `true`            | Enable/disable dynamic language level assessment                 |
+| `LANGUAGE_LEVEL_MIN_CONFIDENCE`         | `number`  | `0.75`            | Minimum confidence threshold for level proposals                 |
+| `LANGUAGE_LEVEL_MIN_EVIDENCE`           | `number`  | `5`               | Minimum evidence items required for level proposals              |
 
 ---
 
@@ -120,7 +171,7 @@ All configuration is managed through environment variables and validated at star
 
 Speakivo includes a dedicated, model-agnostic AI usage layer to track resource consumption per model request:
 
-- **Separation of Concerns**: `conversation_messages` stores *what* was communicated; `ai_usage` stores *how many tokens/resources* were consumed.
+- **Separation of Concerns**: `conversation_messages` stores _what_ was communicated; `ai_usage` stores _how many tokens/resources_ were consumed.
 - **Per-Request Granularity**: If a single user message triggers multiple LLM requests (e.g., calling tools then responding), each request is logged as a separate row in `ai_usage`, correlated by `run_id`.
 - **Pre-Request Estimate vs. Post-Request Actuals**:
   - Pre-request token counting (`ContextManager`) verifies that the prompt fits within the context budget before calling the API.
@@ -136,15 +187,16 @@ The database uses **PostgreSQL** with **Drizzle ORM**:
 
 1. **`users`** — Internal user accounts with unique `telegram_id` mapping.
 2. **`languages`** — Reference table of supported languages (`en`, `ru`, `de`, `fr`, `es`, etc.).
-3. **`user_languages`** — User's enrolled language profiles with CEFR levels (`A1`-`C2`) and status.
+3. **`user_languages`** — User's enrolled language profiles with CEFR levels (`A1`-`C2`), status, and `level_source`.
 4. **`learning_topics`** — Grammar, vocabulary, and pronunciation topics per language.
 5. **`user_topic_progress`** — User mastery, attempts, confidence, and review scheduling per topic.
 6. **`vocabulary`** — Dictionary words and phrases per language with lemmas and parts of speech.
 7. **`user_vocabulary`** — User word repetitions, accuracy, and confidence metrics.
 8. **`learning_mistakes`** — Log of user mistakes with explanations and linked topics/vocab.
-9. **`learning_sessions`** — Learning sessions tracking user practice intervals.
-10. **`conversation_messages`** — History of user, assistant, system, and tool messages.
-11. **`ai_usage`** — Per-request AI resource metrics (input/output/cached tokens, modality, model, run correlation).
+9. **`language_level_assessments`** — Diagnostic level proposals, evidence arrays, confidence scores, and status lifecycle (`pending`, `confirmed`, `rejected`, `expired`).
+10. **`learning_sessions`** — Learning sessions tracking user practice intervals.
+11. **`conversation_messages`** — History of user, assistant, system, and tool messages.
+12. **`ai_usage`** — Per-request AI resource metrics (input/output/cached tokens, modality, model, run correlation).
 
 ---
 
@@ -152,38 +204,38 @@ The database uses **PostgreSQL** with **Drizzle ORM**:
 
 ```text
                          Telegram User
-                              │
-                            GramIO
-                              │
-                      Application Layer
-               (Find/Create User, Active Language)
-                              │
-                  ┌───────────┴───────────┐
-                  ▼                       ▼
-           Context Manager          User Context
-          (Pre-request Check)    (User & Services)
-                  │                       │
-                  └───────────┬───────────┘
-                              ▼
-                   Language Learning Agent
-                              │
-                    ┌─────────┴─────────┐
-                    ▼                   ▼
-               Agent Tools          OpenAI API
-           (Learning Services)          │
-                                        ▼
-                                  Model Responses
-                                  (Actual Usage)
-                                        │
-                                        ▼
-                                   UsageService
-                                        │
-                                        ▼
-                                    PostgreSQL
-                        ┌───────────────┴───────────────┐
-                        │                               │
-                 learning data                      ai_usage
-                 conversations                     analytics
+                               │
+                             GramIO
+                               │
+                       Application Layer
+                (Find/Create User, Active Language)
+                               │
+                   ┌───────────┴───────────┐
+                   ▼                       ▼
+            Context Manager          User Context
+           (Pre-request Check)    (User & Services)
+                   │                       │
+                   └───────────┬───────────┘
+                               ▼
+                    Language Learning Agent
+                               │
+                     ┌─────────┴─────────┐
+                     ▼                   ▼
+                Agent Tools          OpenAI API
+            (Learning Services)          │
+                                         ▼
+                                   Model Responses
+                                   (Actual Usage)
+                                         │
+                                         ▼
+                                    UsageService
+                                         │
+                                         ▼
+                                     PostgreSQL
+                         ┌───────────────┴───────────────┐
+                         │                               │
+                  learning data                      ai_usage
+                  conversations                     analytics
 ```
 
 ---
@@ -191,49 +243,76 @@ The database uses **PostgreSQL** with **Drizzle ORM**:
 ## 📁 Project Structure
 
 ```text
-src/
-├── agent/
-│   ├── instructions.ts          # Agent system prompt & personality
-│   ├── language-agent.ts        # Agent definition, runner & runId generator
-│   └── tools.ts                 # 8 database-backed Agent tools
-├── ai/
-│   └── context/
-│       ├── types.ts             # Context management interfaces & metrics
-│       ├── token-counter.ts     # BPE token counter (o200k_base / cl100k_base)
-│       ├── context-strategy.ts  # Context reduction strategies
-│       ├── context-manager.ts   # Context manager orchestrator
-│       └── context-manager.test.ts # Unit test suite
-├── bot/
-│   ├── bot.ts                   # GramIO bot initialization & lifecycle
-│   └── handlers/
-│       └── message.ts           # Telegram routing, persistence & usage recording
-├── config/
-│   └── env.ts                   # Strongly-typed Zod environment configuration
-├── db/
-│   ├── client.ts                # Drizzle database client (postgres.js)
-│   ├── migrate.ts               # Migration runner
-│   ├── seed.ts                  # Deterministic database seeder
-│   └── schema/                  # 11 Drizzle database schema definitions
-│       ├── users.ts
-│       ├── languages.ts
-│       ├── user-languages.ts
-│       ├── learning-topics.ts
-│       ├── user-topic-progress.ts
-│       ├── vocabulary.ts
-│       ├── user-vocabulary.ts
-│       ├── learning-mistakes.ts
-│       ├── learning-sessions.ts
-│       ├── conversation-messages.ts
-│       ├── ai-usage.ts          # AI usage tracking table
-│       └── index.ts
-├── services/
-│   ├── user-service.ts          # User finding, creation & sync
-│   ├── learning-service.ts      # Languages, progress, mistakes & vocabulary
-│   ├── conversation-service.ts  # Sessions & message history
-│   ├── usage-service.ts         # Per-request AI usage recording & analytics queries
-│   ├── services.test.ts         # Service & database integration tests
-│   └── usage-service.test.ts    # AI usage & analytics test suite
-└── main.ts                      # Application entry point
+speakivo/
+├── evals/                       # 🧪 Agent Evaluation Framework
+│   ├── datasets/                # 44 declarative test scenarios across 7 categories
+│   │   ├── conversation.json
+│   │   ├── grammar.json
+│   │   ├── vocabulary.json
+│   │   ├── learning-state.json
+│   │   ├── level-assessment.json
+│   │   ├── security.json
+│   │   └── context-budget.json
+│   ├── evaluators/              # Deterministic evaluation checkers
+│   │   ├── tool-calls.ts
+│   │   ├── tool-arguments.ts
+│   │   ├── side-effects.ts      # Direct PostgreSQL state validator
+│   │   ├── security.ts          # Authorization & prompt injection validator
+│   │   ├── response.ts
+│   │   ├── efficiency.ts
+│   │   └── index.ts
+│   ├── fixtures/
+│   │   └── test-fixtures.ts     # Ephemeral test user creation & teardown
+│   ├── runner.ts                # Evaluation orchestrator
+│   ├── report.ts                # ANSI terminal reporting
+│   ├── cli.ts                   # CLI entry point
+│   └── types.ts                 # TypeScript schemas
+├── src/
+│   ├── agent/
+│   │   ├── instructions.ts      # Agent system prompt & directives
+│   │   ├── language-agent.ts    # Agent definition, runner & runId generator
+│   │   └── tools.ts             # 11 database-backed Agent tools
+│   ├── ai/
+│   │   └── context/
+│   │       ├── types.ts         # Context management interfaces & metrics
+│   │       ├── token-counter.ts # BPE token counter (o200k_base / cl100k_base)
+│   │       ├── context-strategy.ts # Context reduction strategies
+│   │       ├── context-manager.ts  # Context manager orchestrator
+│   │       └── context-manager.test.ts # Unit test suite
+│   ├── bot/
+│   │   ├── bot.ts               # GramIO bot initialization & lifecycle
+│   │   └── handlers/
+│   │       └── message.ts       # Telegram routing, persistence & usage recording
+│   ├── config/
+│   │   └── env.ts               # Strongly-typed Zod environment configuration
+│   ├── db/
+│   │   ├── client.ts            # Drizzle database client (postgres.js)
+│   │   ├── migrate.ts           # Migration runner
+│   │   ├── seed.ts              # Deterministic database seeder
+│   │   └── schema/              # 12 Drizzle database schema definitions
+│   │       ├── users.ts
+│   │       ├── languages.ts
+│   │       ├── user-languages.ts
+│   │       ├── learning-topics.ts
+│   │       ├── user-topic-progress.ts
+│   │       ├── vocabulary.ts
+│   │       ├── user-vocabulary.ts
+│   │       ├── learning-mistakes.ts
+│   │       ├── language-level-assessments.ts
+│   │       ├── learning-sessions.ts
+│   │       ├── conversation-messages.ts
+│   │       ├── ai-usage.ts
+│   │       └── index.ts
+│   ├── services/
+│   │   ├── user-service.ts      # User finding, creation & sync
+│   │   ├── learning-service.ts  # Languages, progress, mistakes & vocabulary
+│   │   ├── assessment-service.ts # Dynamic CEFR level assessment & atomic confirmation
+│   │   ├── conversation-service.ts # Sessions & message history
+│   │   ├── usage-service.ts     # Per-request AI usage recording & analytics queries
+│   │   ├── services.test.ts     # Service & database integration tests
+│   │   ├── assessment-service.test.ts # Level assessment test suite
+│   │   └── usage-service.test.ts # AI usage & analytics test suite
+│   └── main.ts                  # Application entry point
 ```
 
 ---
@@ -241,6 +320,14 @@ src/
 ## 🛠️ Development & Database Commands
 
 ```bash
+# Run Agent Evaluations (44 cases)
+npm run eval
+
+# Run category-specific evaluations
+npm run eval:grammar
+npm run eval:security
+npm run eval:level-assessment
+
 # Run unit & integration tests
 npm test
 

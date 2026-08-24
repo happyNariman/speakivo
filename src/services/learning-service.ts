@@ -1,4 +1,4 @@
-import { eq, and, sql, desc, asc } from "drizzle-orm";
+import { eq, and, or, ilike, sql, desc, asc } from "drizzle-orm";
 import { db, type Database } from "../db/client.js";
 import {
   userLanguages,
@@ -260,6 +260,60 @@ export class LearningService {
       .limit(limit);
 
     return rows;
+  }
+
+  /**
+   * Finds a topic in the given language by name or slug.
+   */
+  async findTopicByNameOrSlug(
+    languageCode: string,
+    nameOrSlug: string,
+  ): Promise<LearningTopic | null> {
+    const trimmed = nameOrSlug.trim();
+    if (!trimmed) return null;
+
+    const rows = await this.database
+      .select()
+      .from(learningTopics)
+      .where(
+        and(
+          eq(learningTopics.languageCode, languageCode),
+          or(
+            ilike(learningTopics.name, `%${trimmed}%`),
+            ilike(learningTopics.slug, `%${trimmed.toLowerCase().replace(/\s+/g, "-")}%`),
+          ),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Finds a vocabulary item in the given language by word or lemma.
+   */
+  async findVocabularyByWordOrLemma(
+    languageCode: string,
+    wordOrLemma: string,
+  ): Promise<Vocabulary | null> {
+    const trimmed = wordOrLemma.trim();
+    if (!trimmed) return null;
+
+    const rows = await this.database
+      .select()
+      .from(vocabulary)
+      .where(
+        and(
+          eq(vocabulary.languageCode, languageCode),
+          or(
+            ilike(vocabulary.word, `%${trimmed}%`),
+            ilike(vocabulary.lemma, `%${trimmed.toLowerCase()}%`),
+          ),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ?? null;
   }
 
   /**

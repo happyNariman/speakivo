@@ -368,7 +368,17 @@ export const updateTopicProgressTool = tool({
   description:
     "Update practice progress on a grammar topic after user actively practiced or answered an exercise.",
   parameters: z.object({
-    topicId: z.string().uuid().describe("The exact UUID of the learning topic"),
+    topicId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe("The exact UUID of the learning topic, if known"),
+    topicName: z
+      .string()
+      .optional()
+      .describe(
+        "The name of the learning topic (e.g. 'Past Simple'), used if topicId is unknown",
+      ),
     isCorrect: z
       .boolean()
       .describe("Whether the user answered or applied the topic correctly"),
@@ -383,9 +393,26 @@ export const updateTopicProgressTool = tool({
     }
 
     try {
+      let targetTopicId = args.topicId;
+      if (!targetTopicId && args.topicName) {
+        const found = await ctx.learningService.findTopicByNameOrSlug(
+          ctx.languageCode,
+          args.topicName,
+        );
+        if (found) {
+          targetTopicId = found.id;
+        }
+      }
+
+      if (!targetTopicId) {
+        return JSON.stringify({
+          error: "Either a valid topicId or known topicName must be provided",
+        });
+      }
+
       const updated = await ctx.learningService.updateTopicProgress({
         userLanguageId: ctx.userLanguageId,
-        topicId: args.topicId,
+        topicId: targetTopicId,
         isCorrect: args.isCorrect,
         status: args.status,
       });
@@ -416,7 +443,14 @@ export const updateVocabularyProgressTool = tool({
     vocabularyId: z
       .string()
       .uuid()
-      .describe("The exact UUID of the vocabulary item"),
+      .optional()
+      .describe("The exact UUID of the vocabulary item, if known"),
+    word: z
+      .string()
+      .optional()
+      .describe(
+        "The vocabulary word or lemma (e.g. 'meticulous'), used if vocabularyId is unknown",
+      ),
     isCorrect: z
       .boolean()
       .describe("Whether the user used or recalled the word correctly"),
@@ -431,9 +465,26 @@ export const updateVocabularyProgressTool = tool({
     }
 
     try {
+      let targetVocabId = args.vocabularyId;
+      if (!targetVocabId && args.word) {
+        const found = await ctx.learningService.findVocabularyByWordOrLemma(
+          ctx.languageCode,
+          args.word,
+        );
+        if (found) {
+          targetVocabId = found.id;
+        }
+      }
+
+      if (!targetVocabId) {
+        return JSON.stringify({
+          error: "Either a valid vocabularyId or known word must be provided",
+        });
+      }
+
       const updated = await ctx.learningService.updateVocabularyProgress({
         userLanguageId: ctx.userLanguageId,
-        vocabularyId: args.vocabularyId,
+        vocabularyId: targetVocabId,
         isCorrect: args.isCorrect,
         status: args.status,
       });

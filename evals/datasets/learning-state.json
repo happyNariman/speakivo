@@ -1,0 +1,276 @@
+[
+  {
+    "id": "state-001-get-user-profile",
+    "name": "Reading user profile on initial inquiry",
+    "category": "learning-state",
+    "input": "What language and level am I currently learning?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1",
+      "levelSource": "confirmed"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "get_user_profile"
+          }
+        ]
+      },
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["English", "B1"],
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "state-002-get-learning-progress",
+    "name": "Reading learning progress stats",
+    "category": "learning-state",
+    "input": "Can you show me my current overall learning progress and statistics?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "setup": {
+      "topics": [
+        {
+          "name": "Present Simple",
+          "type": "grammar",
+          "confidence": 0.9,
+          "status": "mastered"
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "apple",
+          "lemma": "apple",
+          "confidence": 0.85,
+          "status": "learning"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "get_learning_progress"
+          }
+        ]
+      },
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "state-003-get-weak-topics",
+    "name": "Retrieving weak grammar topics for focused practice",
+    "category": "learning-state",
+    "input": "What are my weakest grammar topics that I need to practice more?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "setup": {
+      "topics": [
+        {
+          "name": "Past Continuous",
+          "type": "grammar",
+          "confidence": 0.4,
+          "status": "review"
+        },
+        {
+          "name": "Passive Voice",
+          "type": "grammar",
+          "confidence": 0.35,
+          "status": "learning"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "get_weak_topics"
+          }
+        ]
+      },
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "state-004-get-vocab-to-review",
+    "name": "Retrieving vocabulary items due for review",
+    "category": "learning-state",
+    "input": "Which vocabulary words should I review today?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "setup": {
+      "vocabulary": [
+        {
+          "word": "ubiquitous",
+          "lemma": "ubiquitous",
+          "translation": "вездесущий",
+          "confidence": 0.45,
+          "status": "review"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "get_vocabulary_to_review"
+          }
+        ]
+      },
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "state-005-get-recent-mistakes",
+    "name": "Retrieving recent mistakes to analyze patterns",
+    "category": "learning-state",
+    "input": "What mistakes have I made recently in our lessons?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "setup": {
+      "mistakes": [
+        {
+          "category": "grammar",
+          "sourceText": "He have two cats",
+          "correctedText": "He has two cats",
+          "explanation": "Use 'has' for third person singular"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "get_recent_mistakes"
+          }
+        ]
+      },
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "state-006-topic-practice-correct",
+    "name": "Updating topic progress after successful practice response",
+    "category": "learning-state",
+    "input": "For the Past Simple exercise: 'She visited her grandparents last Saturday.'",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "setup": {
+      "previousMessages": [
+        {
+          "role": "assistant",
+          "content": "Let's practice the Past Simple! Make a sentence with the verb 'visit'."
+        }
+      ],
+      "topics": [
+        {
+          "name": "Past Simple",
+          "type": "grammar",
+          "confidence": 0.5,
+          "status": "learning"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "update_topic_progress",
+            "arguments": {
+              "isCorrect": true
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "topic_progress_updated"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "state-007-vocab-practice-repetition",
+    "name": "Updating vocabulary progress after successful recall sentence",
+    "category": "learning-state",
+    "input": "Here is my sentence with 'meticulous': 'The architect made meticulous drawings for the new building.'",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B2"
+    },
+    "setup": {
+      "previousMessages": [
+        {
+          "role": "assistant",
+          "content": "Use the word 'meticulous' in a complete sentence."
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "meticulous",
+          "lemma": "meticulous",
+          "translation": "тщательный",
+          "confidence": 0.6,
+          "status": "learning"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "update_vocabulary_progress",
+            "arguments": {
+              "isCorrect": true
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "vocabulary_progress_updated"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  }
+]

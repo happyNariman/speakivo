@@ -56,6 +56,16 @@ export function registerMessageHandler(bot: Bot): void {
       `[handler] incoming message | telegramUserId=${fromUser.id} textLength=${text.length}`,
     );
 
+    // Start "typing..." action immediately and repeat every 4 seconds until response is ready
+    const sendTyping = () => {
+      context.sendChatAction("typing").catch(() => {
+        // Non-fatal: ignore temporary chat action failure
+      });
+    };
+
+    sendTyping();
+    const typingInterval = setInterval(sendTyping, 4000);
+
     try {
       // 1. Find or create user in PostgreSQL
       const user = await userService.findOrCreateByTelegram({
@@ -190,6 +200,8 @@ export function registerMessageHandler(bot: Bot): void {
     } catch (error) {
       console.error("[handler] error processing message:", error);
       await context.send("Sorry, something went wrong. Please try again.");
+    } finally {
+      clearInterval(typingInterval);
     }
   });
 }

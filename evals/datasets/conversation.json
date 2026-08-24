@@ -1,0 +1,184 @@
+[
+  {
+    "id": "conv-001-casual-greeting",
+    "name": "Casual greeting and small talk",
+    "category": "conversation",
+    "input": "Hello! How are you doing today?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "update_topic_progress",
+          "update_vocabulary_progress",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "conv-002-busy-day-at-work",
+    "name": "Casual share about busy workday",
+    "category": "conversation",
+    "input": "I had a very busy day at work today, lots of meetings!",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "update_topic_progress",
+          "update_vocabulary_progress",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "conv-003-asking-about-weather",
+    "name": "Asking tutor about weather / preferences",
+    "category": "conversation",
+    "input": "It is raining outside today. Do you prefer sunny or rainy weather?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "update_topic_progress",
+          "update_vocabulary_progress"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "conv-004-weekend-plans",
+    "name": "Discussing weekend plans with correct grammar",
+    "category": "conversation",
+    "input": "This weekend I am going to visit my parents in the countryside.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "update_topic_progress",
+          "update_vocabulary_progress"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "conv-005-hobby-discussion",
+    "name": "Sharing personal hobby interests",
+    "category": "conversation",
+    "input": "I really enjoy reading science fiction books and listening to jazz music in the evening.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "update_topic_progress",
+          "update_vocabulary_progress"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "conv-006-german-greeting",
+    "name": "German casual greeting on German learning profile",
+    "category": "conversation",
+    "input": "Hallo! Wie geht es dir heute?",
+    "user": {
+      "languageCode": "de",
+      "nativeLanguageCode": "ru",
+      "level": "A1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "update_topic_progress",
+          "update_vocabulary_progress"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  }
+]

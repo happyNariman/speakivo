@@ -1,0 +1,247 @@
+[
+  {
+    "id": "level-001-explicit-test-request",
+    "name": "User explicitly requests a level assessment test",
+    "category": "level-assessment",
+    "input": "Can you test my English level and tell me what CEFR level I am?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A1"
+    },
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "level_not_updated"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "level-002-insufficient-evidence-casual-message",
+    "name": "Single advanced message must NOT change persisted level",
+    "category": "level-assessment",
+    "input": "Notwithstanding the economic headwinds, the corporation managed to increase its quarterly dividends significantly.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": ["confirm_language_level"]
+      },
+      "sideEffects": [
+        {
+          "type": "level_not_updated"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "level-003-confirm-pending-assessment",
+    "name": "User explicitly confirms pending level update to B1",
+    "category": "level-assessment",
+    "input": "Yes, please update my profile level to B1!",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "setup": {
+      "previousMessages": [
+        {
+          "role": "assistant",
+          "content": "Based on our diagnostic exercises, your English appears to be around B1 level. Would you like me to update your profile to B1?"
+        }
+      ],
+      "assessments": [
+        {
+          "previousLevel": "A2",
+          "proposedLevel": "B1",
+          "confidence": 0.85,
+          "evidence": [
+            "Consistent past tense accuracy",
+            "Understands complex instructions",
+            "Expresses abstract thoughts fluently",
+            "Good range of connector words",
+            "Low error rate in spontaneous speech"
+          ],
+          "reason": "Diagnostic assessment confirms B1 competency",
+          "status": "pending"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "confirm_language_level"
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "level_updated",
+          "details": {
+            "level": "B1"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "level-004-ambiguous-confirmation-maybe",
+    "name": "Ambiguous response ('Maybe') must NOT update level",
+    "category": "level-assessment",
+    "input": "Maybe, I'm not really sure. What do you think?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "setup": {
+      "previousMessages": [
+        {
+          "role": "assistant",
+          "content": "I estimate your level at B1. Would you like me to update your profile to B1?"
+        }
+      ],
+      "assessments": [
+        {
+          "previousLevel": "A2",
+          "proposedLevel": "B1",
+          "confidence": 0.85,
+          "evidence": ["e1", "e2", "e3", "e4", "e5"],
+          "reason": "B1 diagnostic",
+          "status": "pending"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": ["confirm_language_level"]
+      },
+      "sideEffects": [
+        {
+          "type": "level_not_updated"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "level-005-explicit-decline-level-update",
+    "name": "User declines level update ('No, keep A2')",
+    "category": "level-assessment",
+    "input": "No thanks, I prefer to keep my level as A2 for now until I feel completely confident.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "setup": {
+      "previousMessages": [
+        {
+          "role": "assistant",
+          "content": "Would you like me to update your level to B1?"
+        }
+      ],
+      "assessments": [
+        {
+          "previousLevel": "A2",
+          "proposedLevel": "B1",
+          "confidence": 0.85,
+          "evidence": ["e1", "e2", "e3", "e4", "e5"],
+          "reason": "B1 proposal",
+          "status": "pending"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": ["confirm_language_level"]
+      },
+      "sideEffects": [
+        {
+          "type": "level_not_updated"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "level-006-level-regression-confirmation",
+    "name": "Confirmed level regression (B2 -> B1)",
+    "category": "level-assessment",
+    "input": "Yes, I agree B1 fits my current speaking level much better. Please set it to B1.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B2"
+    },
+    "setup": {
+      "previousMessages": [
+        {
+          "role": "assistant",
+          "content": "We noticed you feel more comfortable with B1 fundamentals. Would you like to adjust your level to B1?"
+        }
+      ],
+      "assessments": [
+        {
+          "previousLevel": "B2",
+          "proposedLevel": "B1",
+          "confidence": 0.82,
+          "evidence": [
+            "User feels B2 is too challenging",
+            "Frequent hesitation on advanced vocabulary",
+            "Comfort with B1 structures",
+            "Requested more foundational practice",
+            "Diagnostic results align with B1"
+          ],
+          "reason": "Regression alignment requested by user",
+          "status": "pending"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "confirm_language_level"
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "level_updated",
+          "details": {
+            "level": "B1"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  }
+]

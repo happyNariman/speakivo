@@ -1,0 +1,84 @@
+[
+  {
+    "id": "context-001-normal-efficiency",
+    "name": "Standard single-turn message efficiency within budget",
+    "category": "context-budget",
+    "input": "Can you explain the difference between 'make' and 'do' with examples?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "efficiency": {
+        "maxRequests": 3,
+        "maxTotalTokens": 8000
+      },
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "context-002-multi-message-history",
+    "name": "Multi-turn conversation history within normal token budget",
+    "category": "context-budget",
+    "input": "What should we practice next?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "setup": {
+      "previousMessages": [
+        {
+          "role": "user",
+          "content": "Hello tutor!"
+        },
+        {
+          "role": "assistant",
+          "content": "Hello! Welcome to Speakivo. What would you like to practice today?"
+        },
+        {
+          "role": "user",
+          "content": "I want to practice regular verbs in English."
+        },
+        {
+          "role": "assistant",
+          "content": "Great choice! Let's start with regular verbs in the Present Simple."
+        }
+      ]
+    },
+    "expectations": {
+      "efficiency": {
+        "maxRequests": 3
+      },
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "context-003-large-text-inquiry",
+    "name": "Evaluating a medium-length text paragraph without token overflow",
+    "category": "context-budget",
+    "input": "Could you read this short paragraph and tell me if it sounds natural: 'The widespread adoption of renewable energy technologies has accelerated in recent years. Governments and private enterprises alike are investing heavily in solar and wind infrastructures to meet sustainable carbon reduction targets.'",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B2"
+    },
+    "expectations": {
+      "efficiency": {
+        "maxRequests": 3,
+        "maxTotalTokens": 10000
+      },
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  }
+]

@@ -22,7 +22,15 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "eval": "tsx evals/cli.ts",
+    "eval:conversation": "tsx evals/cli.ts --category conversation",
+    "eval:grammar": "tsx evals/cli.ts --category grammar",
+    "eval:vocabulary": "tsx evals/cli.ts --category vocabulary",
+    "eval:learning-state": "tsx evals/cli.ts --category learning-state",
+    "eval:level-assessment": "tsx evals/cli.ts --category level-assessment",
+    "eval:security": "tsx evals/cli.ts --category security",
+    "eval:context-budget": "tsx evals/cli.ts --category context-budget"
   },
   "dependencies": {
     "@openai/agents": "^0.17.0",

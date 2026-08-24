@@ -1,0 +1,219 @@
+[
+  {
+    "id": "vocab-001-definition-collateral",
+    "name": "Vocabulary definition request: 'collateral'",
+    "category": "vocabulary",
+    "input": "What does 'collateral' mean in English?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "save_vocabulary",
+            "argumentSubstrings": {
+              "word": "collateral"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "vocabulary_saved",
+          "details": {
+            "lemma": "collateral"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "vocab-002-explicit-add-word",
+    "name": "Explicit request to add 'serendipity' to vocabulary",
+    "category": "vocabulary",
+    "input": "I learned a new word today: 'serendipity'. Can you add it to my vocabulary list?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "save_vocabulary",
+            "argumentSubstrings": {
+              "word": "serendipity"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "vocabulary_saved",
+          "details": {
+            "lemma": "serendipity"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "vocab-003-false-friend-sympathetic",
+    "name": "False friend vocabulary mistake: 'sympathetic' vs 'nice/pleasant'",
+    "category": "vocabulary",
+    "input": "Our new teacher is very sympathetical and kind.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake",
+            "arguments": {
+              "category": "vocabulary"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded",
+          "details": {
+            "category": "vocabulary"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "vocab-004-german-word-definition",
+    "name": "German vocabulary definition request: 'Gemütlichkeit'",
+    "category": "vocabulary",
+    "input": "Was bedeutet das Wort 'Gemütlichkeit' auf Deutsch?",
+    "user": {
+      "languageCode": "de",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "save_vocabulary",
+            "argumentSubstrings": {
+              "word": "gemütlichkeit"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "vocabulary_saved",
+          "details": {
+            "lemma": "gemütlichkeit"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "vocab-005-idiom-break-the-ice",
+    "name": "Learning idiom 'break the ice'",
+    "category": "vocabulary",
+    "input": "Could you explain what the idiom 'break the ice' means and give an example?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "save_vocabulary"
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "vocabulary_saved"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "vocab-006-synonym-inquiry",
+    "name": "Asking for advanced synonyms of 'important'",
+    "category": "vocabulary",
+    "input": "What are some more advanced and formal synonyms for the word 'important' in business English?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B2"
+    },
+    "expectations": {
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["crucial"],
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "vocab-007-collocation-make-do-mistake",
+    "name": "Collocation mistake: 'do a mistake' instead of 'make a mistake'",
+    "category": "vocabulary",
+    "input": "I did a big mistake on my math exam yesterday.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake"
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["made"],
+        "noRawIds": true
+      }
+    }
+  }
+]

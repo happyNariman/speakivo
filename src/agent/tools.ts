@@ -257,7 +257,7 @@ export const getRecentMistakesTool = tool({
 export const recordLearningMistakeTool = tool({
   name: "record_learning_mistake",
   description:
-    "Record a genuine user mistake in target language with correction and explanation. Call only on real errors.",
+    "Record a genuine mistake produced by the user in their own target language writing or speech. Do NOT call on quoted examples, questions about rules, or text being discussed.",
   parameters: z.object({
     category: z.enum([
       "grammar",
@@ -319,7 +319,7 @@ export const recordLearningMistakeTool = tool({
 export const saveVocabularyTool = tool({
   name: "save_vocabulary",
   description:
-    "Save a new target language word/phrase to user's vocabulary. Call only when explicitly taught or requested.",
+    "Save a new or useful target language word/phrase to user's vocabulary when taught, explained, or requested. Do NOT call on casual mentions of known words.",
   parameters: z.object({
     word: z.string().describe("The word or phrase as used"),
     lemma: z
@@ -366,7 +366,7 @@ export const saveVocabularyTool = tool({
 export const updateTopicProgressTool = tool({
   name: "update_topic_progress",
   description:
-    "Update practice progress on a grammar topic after user actively practiced or answered an exercise.",
+    "Update practice progress on a grammar topic after user actively practices or demonstrates the topic in an exercise.",
   parameters: z.object({
     topicId: z
       .string()
@@ -438,7 +438,7 @@ export const updateTopicProgressTool = tool({
 export const updateVocabularyProgressTool = tool({
   name: "update_vocabulary_progress",
   description:
-    "Update practice progress on a vocabulary word after user actively recalled or practiced that word.",
+    "Update practice progress on a vocabulary word after user actively recalls, uses, or practices that word in an exercise.",
   parameters: z.object({
     vocabularyId: z
       .string()

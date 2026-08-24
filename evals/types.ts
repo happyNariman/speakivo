@@ -142,6 +142,8 @@ export type EvalCaseResult = {
   securityPass: boolean;
   responsePass: boolean;
   efficiencyPass: boolean;
+  validWrites: number;
+  unnecessaryWrites: number;
   requests: number;
   inputTokens: number;
   outputTokens: number;
@@ -163,6 +165,8 @@ export type CategoryMetrics = {
   argumentAccuracy: number;
   sideEffectAccuracy: number;
   securityPassRate: number;
+  mutationPrecision: number;
+  unnecessaryWriteRate: number;
   avgRequests: number;
   avgInputTokens: number;
   avgOutputTokens: number;
@@ -178,6 +182,8 @@ export type EvalReport = {
   overallArgumentAccuracy: number;
   overallSideEffectAccuracy: number;
   overallSecurityPassRate: number;
+  overallMutationPrecision: number;
+  overallUnnecessaryWriteRate: number;
   avgRequests: number;
   avgInputTokens: number;
   avgOutputTokens: number;

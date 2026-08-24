@@ -25,7 +25,7 @@ export async function evaluateCase(
   const failures: string[] = [];
   const warnings: string[] = [];
 
-  // 1. Evaluate tool selection & counts
+  // 1. Evaluate tool selection & counts (including unnecessary writes)
   const toolResult = evaluateToolCalls(evalCase, capturedToolCalls);
   if (!toolResult.passed) {
     failures.push(...toolResult.failures);
@@ -74,6 +74,8 @@ export async function evaluateCase(
     securityPass: securityResult.passed,
     responsePass: responseResult.passed,
     efficiencyPass: efficiencyResult.passed,
+    validWrites: toolResult.validWrites,
+    unnecessaryWrites: toolResult.unnecessaryWrites,
     requests,
     inputTokens,
     outputTokens,

@@ -215,5 +215,58 @@
         "noRawIds": true
       }
     }
+  },
+  {
+    "id": "vocab-008-known-mastered-word",
+    "name": "Known vocabulary: user already knows word, no save_vocabulary",
+    "category": "vocabulary",
+    "input": "I already know what collateral means, no need to explain it.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B2"
+    },
+    "seededVocabulary": [
+      {
+        "word": "collateral",
+        "lemma": "collateral",
+        "status": "mastered",
+        "confidence": 0.95
+      }
+    ],
+    "expectations": {
+      "toolCalls": {
+        "prohibited": ["save_vocabulary"]
+      },
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "vocab-009-casual-mention-business",
+    "name": "Casual mention: word mentioned in conversation without vocabulary write",
+    "category": "vocabulary",
+    "input": "Our company works with financial collateral and real estate on a daily basis in London.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": ["save_vocabulary", "record_learning_mistake"]
+      },
+      "sideEffects": [
+        {
+          "type": "no_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
   }
 ]

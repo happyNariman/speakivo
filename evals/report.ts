@@ -49,31 +49,34 @@ export function formatEvalReport(report: EvalReport, categoryFilter?: string): s
   // Category Breakdown Table
   lines.push(`${BOLD}Category Breakdown:${RESET}`);
   lines.push(
-    `  ${"Category".padEnd(18)} ${"Pass/Total".padEnd(12)} ${"Pass %".padEnd(10)} ${"Tool Acc".padEnd(10)} ${"Side-Effect".padEnd(12)} ${"Avg Tokens"}`,
+    `  ${"Category".padEnd(18)} ${"Pass/Total".padEnd(12)} ${"Pass %".padEnd(9)} ${"Tool Acc".padEnd(9)} ${"Side-Eff".padEnd(9)} ${"Mut Prec".padEnd(9)} ${"Avg Tok"}`,
   );
-  lines.push(`  ${"------------------".padEnd(18)} ${"----------".padEnd(12)} ${"------".padEnd(10)} ${"--------".padEnd(10)} ${"-----------".padEnd(12)} ${"----------"}`);
+  lines.push(`  ${"------------------".padEnd(18)} ${"----------".padEnd(12)} ${"------".padEnd(9)} ${"--------".padEnd(9)} ${"--------".padEnd(9)} ${"--------".padEnd(9)} ${"-------"}`);
 
   for (const cat of report.categoryMetrics) {
     const passColor = cat.failedCases === 0 ? GREEN : RED;
     const catPassStr = `${passColor}${cat.passedCases}/${cat.totalCases}${RESET}`.padEnd(12 + passColor.length + RESET.length);
-    const catRateStr = `${cat.passRate.toFixed(1)}%`.padEnd(10);
-    const toolAccStr = `${cat.toolAccuracy.toFixed(1)}%`.padEnd(10);
-    const sideAccStr = `${cat.sideEffectAccuracy.toFixed(1)}%`.padEnd(12);
+    const catRateStr = `${cat.passRate.toFixed(1)}%`.padEnd(9);
+    const toolAccStr = `${cat.toolAccuracy.toFixed(1)}%`.padEnd(9);
+    const sideAccStr = `${cat.sideEffectAccuracy.toFixed(1)}%`.padEnd(9);
+    const mutPrecStr = `${cat.mutationPrecision.toFixed(1)}%`.padEnd(9);
     const avgTokStr = `${Math.round(cat.avgTotalTokens)}`;
 
     lines.push(
-      `  ${cat.category.padEnd(18)} ${catPassStr} ${catRateStr} ${toolAccStr} ${sideAccStr} ${avgTokStr}`,
+      `  ${cat.category.padEnd(18)} ${catPassStr} ${catRateStr} ${toolAccStr} ${sideAccStr} ${mutPrecStr} ${avgTokStr}`,
     );
   }
 
   lines.push("");
 
   // Quality & Accuracy Metrics
-  lines.push(`${BOLD}Accuracy Metrics:${RESET}`);
-  lines.push(`  • Tool-call accuracy:     ${report.overallToolAccuracy.toFixed(1)}%`);
-  lines.push(`  • Argument accuracy:      ${report.overallArgumentAccuracy.toFixed(1)}%`);
-  lines.push(`  • Side-effect accuracy:   ${report.overallSideEffectAccuracy.toFixed(1)}%`);
-  lines.push(`  • Security pass rate:     ${report.overallSecurityPassRate.toFixed(1)}%`);
+  lines.push(`${BOLD}Accuracy & Precision Metrics:${RESET}`);
+  lines.push(`  • Tool-call accuracy:         ${report.overallToolAccuracy.toFixed(1)}%`);
+  lines.push(`  • Argument accuracy:          ${report.overallArgumentAccuracy.toFixed(1)}%`);
+  lines.push(`  • Side-effect accuracy:       ${report.overallSideEffectAccuracy.toFixed(1)}%`);
+  lines.push(`  • Security pass rate:         ${report.overallSecurityPassRate.toFixed(1)}%`);
+  lines.push(`  • Mutation precision:         ${report.overallMutationPrecision.toFixed(1)}%`);
+  lines.push(`  • Unnecessary-write rate:     ${report.overallUnnecessaryWriteRate.toFixed(1)}%`);
   lines.push("");
 
   // Efficiency Metrics

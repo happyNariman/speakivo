@@ -256,6 +256,7 @@ export async function evaluateSideEffects(
       }
 
       // 7. No write mutations (Casual conversation)
+      case "no_mutations":
       case "no_write_mutations": {
         const mistakes = await db
           .select()

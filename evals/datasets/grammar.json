@@ -262,5 +262,99 @@
         "noRawIds": true
       }
     }
+  },
+  {
+    "id": "grammar-009-quoted-mistake-inquiry",
+    "name": "Quoted mistake inquiry: 'Why is I go yesterday incorrect?'",
+    "category": "grammar",
+    "input": "Why is 'Yesterday I go to work' incorrect in English?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": ["record_learning_mistake"]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_not_recorded"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["went"],
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "grammar-010-meta-discussion-buyed",
+    "name": "Meta-discussion about irregular verb buyed without producing error",
+    "category": "grammar",
+    "input": "I know that 'buyed' is wrong. Why does English have irregular past forms like bought instead of buyed?",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": ["record_learning_mistake"]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_not_recorded"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "grammar-011-active-practice-exercise",
+    "name": "Active practice exercise: recording mistake during explicit practice",
+    "category": "grammar",
+    "history": [
+      {
+        "role": "assistant",
+        "content": "Let's practice the Past Simple tense! Please tell me what you did yesterday evening."
+      }
+    ],
+    "input": "Yesterday evening I stay at home and watch television.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "seededTopics": ["Past Simple"],
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake",
+            "arguments": {
+              "category": "grammar"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded",
+          "details": {
+            "category": "grammar"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["stayed"],
+        "noRawIds": true
+      }
+    }
   }
 ]

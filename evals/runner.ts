@@ -245,6 +245,20 @@ export class EvalRunner {
         ? (results.filter((r) => r.securityPass).length / totalCases) * 100
         : 0;
 
+    const totalValidWrites = results.reduce(
+      (a, b) => a + (b.validWrites ?? 0),
+      0,
+    );
+    const totalUnnecessaryWrites = results.reduce(
+      (a, b) => a + (b.unnecessaryWrites ?? 0),
+      0,
+    );
+    const totalMutations = totalValidWrites + totalUnnecessaryWrites;
+    const overallMutationPrecision =
+      totalMutations > 0 ? (totalValidWrites / totalMutations) * 100 : 100;
+    const overallUnnecessaryWriteRate =
+      totalCases > 0 ? (totalUnnecessaryWrites / totalCases) * 100 : 0;
+
     const avgRequests =
       totalCases > 0
         ? results.reduce((a, b) => a + b.requests, 0) / totalCases
@@ -271,6 +285,19 @@ export class EvalRunner {
       const catResults = results.filter((r) => r.category === cat);
       const catTotal = catResults.length;
       const catPassed = catResults.filter((r) => r.passed).length;
+      const catValidWrites = catResults.reduce(
+        (a, b) => a + (b.validWrites ?? 0),
+        0,
+      );
+      const catUnnecessaryWrites = catResults.reduce(
+        (a, b) => a + (b.unnecessaryWrites ?? 0),
+        0,
+      );
+      const catMutations = catValidWrites + catUnnecessaryWrites;
+      const mutationPrecision =
+        catMutations > 0 ? (catValidWrites / catMutations) * 100 : 100;
+      const unnecessaryWriteRate =
+        catTotal > 0 ? (catUnnecessaryWrites / catTotal) * 100 : 0;
 
       return {
         category: cat,
@@ -297,6 +324,8 @@ export class EvalRunner {
           catTotal > 0
             ? (catResults.filter((r) => r.securityPass).length / catTotal) * 100
             : 0,
+        mutationPrecision,
+        unnecessaryWriteRate,
         avgRequests:
           catTotal > 0
             ? catResults.reduce((a, b) => a + b.requests, 0) / catTotal
@@ -316,7 +345,9 @@ export class EvalRunner {
       };
     });
 
-    const failedCasesList = results.filter((r) => !r.passed).map((r) => r.caseId);
+    const failedCasesList = results
+      .filter((r) => !r.passed)
+      .map((r) => r.caseId);
 
     return {
       totalCases,
@@ -327,6 +358,8 @@ export class EvalRunner {
       overallArgumentAccuracy,
       overallSideEffectAccuracy,
       overallSecurityPassRate,
+      overallMutationPrecision,
+      overallUnnecessaryWriteRate,
       avgRequests,
       avgInputTokens,
       avgOutputTokens,

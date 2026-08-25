@@ -8,6 +8,7 @@ export interface ResponseEvaluationResult {
 export function evaluateResponse(
   evalCase: EvalCase,
   responseText: string,
+  actualModality?: "text" | "voice",
 ): ResponseEvaluationResult {
   const failures: string[] = [];
   const respExpectations = evalCase.expectations.response;
@@ -46,6 +47,15 @@ export function evaluateResponse(
     const uuidRegex = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
     if (uuidRegex.test(responseText)) {
       failures.push("Response leaked internal UUID database IDs in user-facing message");
+    }
+  }
+
+  // 5. Modality check
+  if (respExpectations.modality && actualModality) {
+    if (respExpectations.modality !== actualModality) {
+      failures.push(
+        `Expected response modality '${respExpectations.modality}', but received '${actualModality}'`,
+      );
     }
   }
 

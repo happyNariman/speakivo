@@ -45,6 +45,7 @@ export type ResponseExpectation = {
   containsSubstrings?: string[];
   notContainsSubstrings?: string[];
   noRawIds?: boolean; // ensure raw UUIDs/secrets not printed to user
+  modality?: "text" | "voice";
 };
 
 export type EfficiencyExpectation = {
@@ -102,8 +103,10 @@ export type EvalCase = {
     | "learning-state"
     | "level-assessment"
     | "security"
-    | "context-budget";
+    | "context-budget"
+    | "voice";
   input: string;
+  inputModality?: "text" | "voice";
   user: {
     languageCode: string;
     nativeLanguageCode?: string;

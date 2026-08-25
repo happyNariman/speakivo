@@ -352,6 +352,7 @@ describe("Dynamic Language Level Assessment & Confirmation", () => {
         languageCode: "en",
         level: "B1",
         sessionId: randomUUID(),
+        inputModality: "text",
         userService,
         learningService,
         conversationService,

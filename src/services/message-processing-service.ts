@@ -1,14 +1,24 @@
 import type { AgentInputItem } from "@openai/agents";
 import { env } from "../config/env.js";
-import { userService, type TelegramUserData, type UserService } from "./user-service.js";
+import {
+  userService,
+  type TelegramUserData,
+  type UserService,
+} from "./user-service.js";
 import {
   learningService,
   type LearningService,
   type CEFRLevel,
 } from "./learning-service.js";
-import { conversationService, type ConversationService } from "./conversation-service.js";
+import {
+  conversationService,
+  type ConversationService,
+} from "./conversation-service.js";
 import { usageService, type UsageService } from "./usage-service.js";
-import { assessmentService, type AssessmentService } from "./assessment-service.js";
+import {
+  assessmentService,
+  type AssessmentService,
+} from "./assessment-service.js";
 import {
   runLanguageAgent,
   type AgentContext,
@@ -16,6 +26,13 @@ import {
 } from "../agent/language-agent.js";
 import type { SpeechToTextService } from "../audio/speech-to-text.service.js";
 import { speechToTextService } from "../audio/openai-speech-to-text.service.js";
+import type { TextToSpeechService } from "../audio/text-to-speech.service.js";
+import { textToSpeechService } from "../audio/openai-text-to-speech.service.js";
+import {
+  type ResponseModality,
+  detectExplicitModalityRequest,
+} from "../types/modality.js";
+import { normalizeMarkdownForSpeech } from "../audio/markdown-normalizer.js";
 
 export interface ProcessTextMessageParams {
   telegramUser: TelegramUserData;
@@ -33,7 +50,9 @@ export interface ProcessVoiceMessageParams {
 export interface ProcessMessageResult {
   response: string;
   transcript?: string;
-  isVoice: boolean;
+  finalModality: ResponseModality;
+  audioBuffer?: Buffer;
+  audioMimeType?: string;
   userMessageId?: string;
   assistantMessageId?: string;
 }
@@ -64,6 +83,7 @@ export class MessageProcessingService {
     private readonly useSvc: UsageService = usageService,
     private readonly assessSvc: AssessmentService = assessmentService,
     private readonly sttSvc: SpeechToTextService = speechToTextService,
+    private readonly ttsSvc: TextToSpeechService = textToSpeechService,
   ) {}
 
   /**
@@ -107,7 +127,10 @@ export class MessageProcessingService {
       messageType: "text",
     });
 
-    // 6. Execute Agent pipeline
+    // 6. Detect explicit modality preference
+    const requestedOutputModality = detectExplicitModalityRequest(text);
+
+    // 7. Execute Agent pipeline
     const agentResult = await this.executeAgent({
       user,
       userLanguage: {
@@ -118,21 +141,36 @@ export class MessageProcessingService {
       session,
       currentText: text,
       userMessageId: userMsg.id,
+      inputModality: "text",
+      requestedOutputModality,
     });
 
-    // 7. Save assistant message
+    // 8. Resolve final output modality & synthesize speech if voice
+    const delivery = await this.resolveAndDeliverResponse({
+      userId: user.id,
+      sessionId: session.id,
+      userMessageId: userMsg.id,
+      languageCode: userLanguage.languageCode,
+      agentResult,
+      inputModality: "text",
+      requestedOutputModality,
+    });
+
+    // 9. Save assistant message
     const assistantMsg = await this.convSvc.saveMessage({
       sessionId: session.id,
       role: "assistant",
       content: agentResult.response,
-      messageType: "text",
+      messageType: delivery.finalModality,
       inputTokens: agentResult.inputTokens,
       outputTokens: agentResult.outputTokens,
     });
 
     return {
       response: agentResult.response,
-      isVoice: false,
+      finalModality: delivery.finalModality,
+      audioBuffer: delivery.audioBuffer,
+      audioMimeType: delivery.audioMimeType,
       userMessageId: userMsg.id,
       assistantMessageId: assistantMsg.id,
     };
@@ -188,7 +226,7 @@ export class MessageProcessingService {
       return {
         response:
           "Sorry, I couldn't understand that voice message. Please try sending it again.",
-        isVoice: true,
+        finalModality: "text",
       };
     }
 
@@ -242,7 +280,10 @@ export class MessageProcessingService {
       );
     }
 
-    // 9. Execute Agent pipeline with transcript
+    // 9. Detect explicit modality preference in transcript
+    const requestedOutputModality = detectExplicitModalityRequest(transcript);
+
+    // 10. Execute Agent pipeline with transcript
     const agentResult = await this.executeAgent({
       user,
       userLanguage: {
@@ -253,14 +294,27 @@ export class MessageProcessingService {
       session,
       currentText: transcript,
       userMessageId: userMsg.id,
+      inputModality: "voice",
+      requestedOutputModality,
     });
 
-    // 10. Save assistant response
+    // 11. Resolve final output modality & synthesize speech if voice
+    const delivery = await this.resolveAndDeliverResponse({
+      userId: user.id,
+      sessionId: session.id,
+      userMessageId: userMsg.id,
+      languageCode: userLanguage.languageCode,
+      agentResult,
+      inputModality: "voice",
+      requestedOutputModality,
+    });
+
+    // 12. Save assistant response
     const assistantMsg = await this.convSvc.saveMessage({
       sessionId: session.id,
       role: "assistant",
       content: agentResult.response,
-      messageType: "text",
+      messageType: delivery.finalModality,
       inputTokens: agentResult.inputTokens,
       outputTokens: agentResult.outputTokens,
     });
@@ -268,9 +322,114 @@ export class MessageProcessingService {
     return {
       response: agentResult.response,
       transcript,
-      isVoice: true,
+      finalModality: delivery.finalModality,
+      audioBuffer: delivery.audioBuffer,
+      audioMimeType: delivery.audioMimeType,
       userMessageId: userMsg.id,
       assistantMessageId: assistantMsg.id,
+    };
+  }
+
+  /**
+   * Resolves the final response modality following the strict precedence rules:
+   * 1. Global kill-switch: if VOICE_REPLY_ENABLED = false -> "text".
+   * 2. Explicit user request (e.g. "Answer in writing" -> "text", "Answer with voice" -> "voice").
+   * 3. Agent decision (e.g. pronunciation practice, listening comprehension -> "voice").
+   * 4. Incoming message modality default (voice -> "voice" when DEFAULT_VOICE_REPLY_TO_VOICE_MESSAGE = true).
+   * 5. Baseline default ("text").
+   *
+   * If voice is chosen, synthesizes speech via TextToSpeechService and records AI usage.
+   * If synthesis fails, falls back gracefully to "text".
+   */
+  private async resolveAndDeliverResponse(params: {
+    userId: string;
+    sessionId: string;
+    userMessageId: string;
+    languageCode: string;
+    agentResult: AgentRunResult;
+    inputModality: ResponseModality;
+    requestedOutputModality?: ResponseModality;
+  }): Promise<{
+    finalModality: ResponseModality;
+    audioBuffer?: Buffer;
+    audioMimeType?: string;
+  }> {
+    const {
+      userId,
+      sessionId,
+      userMessageId,
+      languageCode,
+      agentResult,
+      inputModality,
+      requestedOutputModality,
+    } = params;
+
+    let targetModality: ResponseModality = "text";
+
+    if (!env.VOICE_REPLY_ENABLED) {
+      targetModality = "text";
+    } else if (requestedOutputModality) {
+      targetModality = requestedOutputModality;
+    } else if (agentResult.modality === "voice") {
+      targetModality = "voice";
+    } else if (
+      inputModality === "voice" &&
+      env.DEFAULT_VOICE_REPLY_TO_VOICE_MESSAGE
+    ) {
+      targetModality = "voice";
+    } else {
+      targetModality = agentResult.modality ?? "text";
+    }
+
+    if (targetModality === "voice") {
+      try {
+        const speechText = normalizeMarkdownForSpeech(agentResult.response);
+        const ttsResult = await this.ttsSvc.synthesize({
+          text: speechText,
+          languageCode,
+        });
+
+        // Record TTS AI usage
+        try {
+          await this.useSvc.recordUsage({
+            userId,
+            sessionId,
+            messageId: userMessageId,
+            model: env.OPENAI_TTS_MODEL,
+            provider: "openai",
+            operation: "text_to_speech",
+            inputModality: "text",
+            outputModality: "audio",
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            usageDetails: ttsResult.usage ?? null,
+          });
+        } catch (ttsUsageErr) {
+          console.error(
+            "[tts] Failed to record TTS usage (non-fatal):",
+            ttsUsageErr,
+          );
+        }
+
+        return {
+          finalModality: "voice",
+          audioBuffer: ttsResult.audio,
+          audioMimeType: ttsResult.mimeType,
+        };
+      } catch (ttsError) {
+        console.error(
+          `[tts] Speech synthesis failed for userId=${userId}, falling back to text response:`,
+          ttsError,
+        );
+        return {
+          finalModality: "text",
+        };
+      }
+    }
+
+    return {
+      finalModality: "text",
     };
   }
 
@@ -284,8 +443,18 @@ export class MessageProcessingService {
     session: { id: string };
     currentText: string;
     userMessageId: string;
+    inputModality: ResponseModality;
+    requestedOutputModality?: ResponseModality;
   }): Promise<AgentRunResult> {
-    const { user, userLanguage, session, currentText, userMessageId } = params;
+    const {
+      user,
+      userLanguage,
+      session,
+      currentText,
+      userMessageId,
+      inputModality,
+      requestedOutputModality,
+    } = params;
 
     // Load recent conversation history (excluding the current user message just saved)
     const recentMessages = await this.convSvc.getRecentMessages(
@@ -334,6 +503,8 @@ export class MessageProcessingService {
       languageCode: userLanguage.languageCode,
       level: userLanguage.level,
       sessionId: session.id,
+      inputModality,
+      requestedOutputModality,
       userService: this.userSvc,
       learningService: this.learnSvc,
       conversationService: this.convSvc,

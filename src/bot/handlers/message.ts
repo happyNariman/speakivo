@@ -1,6 +1,85 @@
-import type { Bot } from "gramio";
+import { MediaUpload, type Bot } from "gramio";
 import { markdownToFormattable } from "@gramio/format/markdown";
-import { messageProcessingService } from "../../services/message-processing-service.js";
+import {
+  messageProcessingService,
+  type ProcessMessageResult,
+} from "../../services/message-processing-service.js";
+
+/**
+ * Dispatches the processed response to Telegram using the resolved modality (voice or text).
+ *
+ * If sendVoice is blocked by user privacy settings (VOICE_MESSAGES_FORBIDDEN),
+ * attempts fallback delivery via sendAudio or sendDocument before falling back to pure text.
+ */
+async function dispatchTelegramResponse(
+  context: any,
+  result: ProcessMessageResult,
+): Promise<void> {
+  if (result.finalModality === "voice" && result.audioBuffer) {
+    const audioUpload = MediaUpload.buffer(
+      new Uint8Array(result.audioBuffer),
+      "voice.ogg",
+    );
+
+    // 1. Primary: send as Telegram voice message
+    try {
+      await context.bot.api.sendVoice({
+        chat_id: context.chatId,
+        voice: audioUpload,
+      });
+      return;
+    } catch (voiceSendErr: any) {
+      console.warn(
+        `[handler] sendVoice failed (${voiceSendErr?.message ?? voiceSendErr}), trying sendAudio fallback...`,
+      );
+
+      // 2. Secondary fallback: send as standard playable audio file (bypasses VOICE_MESSAGES_FORBIDDEN)
+      try {
+        await context.bot.api.sendAudio({
+          chat_id: context.chatId,
+          audio: MediaUpload.buffer(
+            new Uint8Array(result.audioBuffer),
+            "voice.ogg",
+          ),
+          title: "Voice Reply",
+          performer: "Speakivo Tutor",
+        });
+        return;
+      } catch (audioSendErr: any) {
+        console.warn(
+          `[handler] sendAudio failed (${audioSendErr?.message ?? audioSendErr}), trying sendDocument fallback...`,
+        );
+
+        // 3. Tertiary fallback: send as audio document
+        try {
+          await context.bot.api.sendDocument({
+            chat_id: context.chatId,
+            document: MediaUpload.buffer(
+              new Uint8Array(result.audioBuffer),
+              "voice.ogg",
+            ),
+          });
+          return;
+        } catch (docSendErr: any) {
+          console.warn(
+            `[handler] All audio transmission methods failed (${docSendErr?.message ?? docSendErr}), falling back to text response.`,
+          );
+        }
+      }
+    }
+  }
+
+  // Fallback or explicit text delivery
+  try {
+    await context.send(markdownToFormattable(result.response));
+  } catch (formatErr) {
+    console.warn(
+      "[handler] Markdown send failed, falling back to plain text:",
+      formatErr,
+    );
+    await context.send(result.response);
+  }
+}
 
 export function registerMessageHandler(bot: Bot): void {
   bot.on("message", async (context) => {
@@ -42,15 +121,7 @@ export function registerMessageHandler(bot: Bot): void {
           text,
         });
 
-        try {
-          await context.send(markdownToFormattable(result.response));
-        } catch (formatErr) {
-          console.warn(
-            "[handler] Markdown send failed, falling back to plain text:",
-            formatErr,
-          );
-          await context.send(result.response);
-        }
+        await dispatchTelegramResponse(context, result);
       } catch (error) {
         console.error("[handler] error processing text message:", error);
         await context.send("Sorry, something went wrong. Please try again.");
@@ -69,7 +140,9 @@ export function registerMessageHandler(bot: Bot): void {
       );
 
       const sendTyping = () => {
-        context.sendChatAction("typing").catch(() => {});
+        context.sendChatAction("record_voice").catch(() => {
+          context.sendChatAction("typing").catch(() => {});
+        });
       };
       sendTyping();
       const typingInterval = setInterval(sendTyping, 4000);
@@ -98,15 +171,7 @@ export function registerMessageHandler(bot: Bot): void {
           durationSeconds: voice.duration,
         });
 
-        try {
-          await context.send(markdownToFormattable(result.response));
-        } catch (formatErr) {
-          console.warn(
-            "[handler] Markdown send failed, falling back to plain text:",
-            formatErr,
-          );
-          await context.send(result.response);
-        }
+        await dispatchTelegramResponse(context, result);
       } catch (error) {
         console.error("[handler] error processing voice message:", error);
         await context.send(

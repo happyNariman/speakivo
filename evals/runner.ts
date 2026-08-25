@@ -2,10 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { Agent, run, tool, type ModelResponse } from "@openai/agents";
 import { env } from "../src/config/env.js";
-import { LANGUAGE_TUTOR_INSTRUCTIONS } from "../src/agent/instructions.js";
+import {
+  LANGUAGE_TUTOR_INSTRUCTIONS,
+  getAgentInstructions,
+} from "../src/agent/instructions.js";
 import { agentTools } from "../src/agent/tools.js";
-import { contextManager } from "../src/agent/language-agent.js";
-import type { AgentContext } from "../src/agent/language-agent.js";
+import {
+  contextManager,
+  AgentResponseSchema,
+  type AgentContext,
+} from "../src/agent/language-agent.js";
+import { detectExplicitModalityRequest } from "../src/types/modality.js";
 import type { AgentInputItem } from "../src/ai/context/types.js";
 import { setupEvalFixtures } from "./fixtures/test-fixtures.js";
 import { evaluateCase } from "./evaluators/index.js";
@@ -93,16 +100,30 @@ export class EvalRunner {
         return cloned;
       });
 
-      // 2. Create evaluation agent instance
-      const evalAgent = new Agent<AgentContext>({
+      // 2. Create evaluation agent instance with AgentResponseSchema
+      const evalAgent = new Agent<AgentContext, typeof AgentResponseSchema>({
         name: "Language Learning Tutor (Eval)",
-        instructions: LANGUAGE_TUTOR_INSTRUCTIONS,
+        instructions: (runContext) => getAgentInstructions(runContext),
         model: env.OPENAI_MODEL,
         tools: instrumentedTools,
+        outputType: AgentResponseSchema,
       });
 
-      // 3. Check for empty transcript or STT failure special cases
+      // 3. Set input modality and detect explicit requests
+      const inputModality =
+        evalCase.inputModality ??
+        (evalCase.category === "voice" ? "voice" : "text");
+      const requestedOutputModality = detectExplicitModalityRequest(
+        evalCase.input,
+      );
+
+      fixture.agentContext.inputModality = inputModality;
+      fixture.agentContext.requestedOutputModality = requestedOutputModality;
+
+      // 4. Check for empty transcript or STT failure special cases
       let responseText = "";
+      let actualModality: "text" | "voice" =
+        requestedOutputModality ?? (inputModality === "voice" ? "voice" : "text");
       let rawResponses: ModelResponse[] = [];
       let inputTokens = 0;
       let outputTokens = 0;
@@ -111,12 +132,14 @@ export class EvalRunner {
         // Empty transcript bypasses Agent call as required by Stage 8 spec
         responseText =
           "Sorry, I couldn't understand that voice message. Please try sending it again.";
+        actualModality = "text";
       } else if (evalCase.input === "[STT_ERROR]") {
         // STT failure bypasses Agent call as required by Stage 8 spec
         responseText =
           "Sorry, I couldn't understand that voice message. Please try sending it again.";
+        actualModality = "text";
       } else {
-        // 4. Build input items (from setup messages + current input)
+        // 5. Build input items (from setup messages + current input)
         const inputItems: AgentInputItem[] = [];
 
         if (evalCase.setup?.previousMessages) {
@@ -141,13 +164,13 @@ export class EvalRunner {
           content: evalCase.input,
         });
 
-        // 5. Apply Context Management
+        // 6. Apply Context Management
         const contextResult = contextManager.prepare(inputItems, {
           instructions: LANGUAGE_TUTOR_INSTRUCTIONS,
           userId: fixture.agentContext.userId,
         });
 
-        // 6. Execute Agent
+        // 7. Execute Agent
         const agentResult = await run(evalAgent, contextResult.input, {
           context: fixture.agentContext,
         });
@@ -161,20 +184,76 @@ export class EvalRunner {
           }
         }
 
-        if (typeof agentResult.finalOutput === "string" && agentResult.finalOutput.trim().length > 0) {
-          responseText = agentResult.finalOutput.trim();
+        const finalOutput = agentResult.finalOutput;
+        if (
+          finalOutput &&
+          typeof finalOutput === "object" &&
+          typeof (finalOutput as any).text === "string"
+        ) {
+          responseText = (finalOutput as any).text.trim();
+          if (
+            (finalOutput as any).modality === "voice" ||
+            (finalOutput as any).modality === "text"
+          ) {
+            actualModality = (finalOutput as any).modality;
+          }
+        } else if (
+          typeof finalOutput === "string" &&
+          finalOutput.trim().length > 0
+        ) {
+          try {
+            const parsed = JSON.parse(finalOutput);
+            if (parsed.text) {
+              responseText = String(parsed.text).trim();
+              if (parsed.modality === "voice" || parsed.modality === "text") {
+                actualModality = parsed.modality;
+              }
+            } else {
+              responseText = finalOutput.trim();
+            }
+          } catch {
+            responseText = finalOutput.trim();
+          }
         } else if (Array.isArray((agentResult as any).messages)) {
           const msgs = (agentResult as any).messages;
           for (let i = msgs.length - 1; i >= 0; i--) {
             const m = msgs[i];
             if (m.role === "assistant" && Array.isArray(m.content)) {
-              const textChunk = m.content.find((c: any) => c.type === "output_text" || c.type === "text");
+              const textChunk = m.content.find(
+                (c: any) => c.type === "output_text" || c.type === "text",
+              );
               if (textChunk?.text?.trim()) {
-                responseText = textChunk.text.trim();
+                try {
+                  const parsed = JSON.parse(textChunk.text);
+                  responseText = (parsed.text ?? textChunk.text).trim();
+                  if (
+                    parsed.modality === "voice" ||
+                    parsed.modality === "text"
+                  ) {
+                    actualModality = parsed.modality;
+                  }
+                } catch {
+                  responseText = textChunk.text.trim();
+                }
                 break;
               }
-            } else if (m.role === "assistant" && typeof m.content === "string" && m.content.trim()) {
-              responseText = m.content.trim();
+            } else if (
+              m.role === "assistant" &&
+              typeof m.content === "string" &&
+              m.content.trim()
+            ) {
+              try {
+                const parsed = JSON.parse(m.content);
+                responseText = (parsed.text ?? m.content).trim();
+                if (
+                  parsed.modality === "voice" ||
+                  parsed.modality === "text"
+                ) {
+                  actualModality = parsed.modality;
+                }
+              } catch {
+                responseText = m.content.trim();
+              }
               break;
             }
           }
@@ -183,7 +262,7 @@ export class EvalRunner {
 
       const durationMs = Date.now() - startTime;
 
-      // 7. Run full evaluation across tools, arguments, database side-effects, security, efficiency
+      // 8. Run full evaluation across tools, arguments, database side-effects, security, efficiency, modality
       return await evaluateCase(
         evalCase,
         fixture,
@@ -193,6 +272,7 @@ export class EvalRunner {
         inputTokens,
         outputTokens,
         durationMs,
+        actualModality,
       );
     } catch (error) {
       const durationMs = Date.now() - startTime;

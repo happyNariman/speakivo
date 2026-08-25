@@ -1,21 +1,22 @@
 # 🌍 Speakivo — AI Language Learning Companion
 
-Speakivo is an intelligent, conversational Telegram bot that helps you practice and learn any language through natural dialogue — both in **text** and **voice**. Powered by the **OpenAI Agents SDK**, **OpenAI Speech-to-Text**, **GramIO**, and **PostgreSQL with Drizzle ORM**, Speakivo adapts to your learning pace, explains grammar, corrects mistakes, tracks vocabulary progress, and remembers your learning history.
+Speakivo is an intelligent, conversational Telegram bot that helps you practice and learn any language through natural dialogue — both in **text** and **voice**. Powered by the **OpenAI Agents SDK**, **OpenAI Speech-to-Text & Text-to-Speech**, **GramIO**, and **PostgreSQL with Drizzle ORM**, Speakivo adapts to your learning pace, explains grammar, corrects mistakes, tracks vocabulary progress, and remembers your learning history.
 
 ---
 
 ## ✨ Features
 
 - 🌐 **Learn Any Language** — Practice German, Spanish, French, Japanese, English, or any language you choose without rigid presets.
-- 🎙️ **Voice & Text Input** — Send typed text or record Telegram voice messages; speech is accurately transcribed via OpenAI Speech-to-Text and seamlessly processed by the same AI Tutor.
+- 🎙️ **Multimodal Voice & Text** — Send typed text or voice messages, and receive intelligent text or spoken voice responses synthesized with OpenAI Text-to-Speech (`gpt-4o-mini-tts` / `tts-1`, Opus format).
+- 🧠 **Intelligent Response Modality** — Modality decisions follow a strict pedagogical hierarchy: explicit user requests override defaults, voice input replies with voice by default, and the Agent can autonomously speak to demonstrate pronunciation.
 - 🤖 **Conversational AI Tutor** — Engaging dialogues, polite error corrections, concise grammar explanations, and context-aware follow-up questions.
 - 🛠️ **Agentic Learning Tools** — Built-in AI tools for retrieving user profile, analyzing weak topics, reviewing vocabulary, updating practice stats, and recording learning mistakes.
 - 📈 **Dynamic CEFR Level Assessment** — Multi-dimensional diagnostic evaluation, confidence scoring, evidence collection, and atomic confirmation to keep learner proficiency up-to-date.
-- 🧪 **Agent Evaluation Framework (Evals)** — Local, deterministic test suite (54 test cases across 8 categories) measuring tool selection, argument accuracy, database side effects, mutation precision, security invariants, and token efficiency.
-- 💾 **Persistent Learning & Sessions** — PostgreSQL database powered by Drizzle ORM storing users, language levels, topics, vocabulary, mistake history, chat sessions, and voice metadata.
-- 📊 **Granular AI Usage Tracking** — Dedicated analytics layer recording per-request LLM and STT operations (tokens, modalities, model, run correlation) independently from conversation messages.
+- 🧪 **Agent Evaluation Framework (Evals)** — Local, deterministic test suite (58 test cases across 8 categories) measuring tool selection, argument accuracy, database side effects, mutation precision, response modality, security invariants, and token efficiency.
+- 💾 **Persistent Learning & Sessions** — PostgreSQL database powered by Drizzle ORM storing users, language levels, topics, vocabulary, mistake history, chat sessions, and multimodal metadata.
+- 📊 **Granular AI Usage Tracking** — Dedicated analytics layer recording per-request operations (`speech_to_text`, `agent_response`, `text_to_speech`) independently from conversation messages.
 - ⚡ **Smart Token & Context Management** — BPE token counter (`o200k_base` / `cl100k_base`) ensures requests stay within configured limits and eliminates context overflows.
-- 🛡️ **Type-Safe & Robust** — Built with TypeScript, GramIO, Drizzle ORM, and strict Zod runtime configuration validation.
+- 🛡️ **Type-Safe & Robust** — Built with TypeScript, GramIO, Drizzle ORM, and strict Zod runtime configuration validation with graceful fallback on TTS provider errors.
 - 🐳 **Containerized** — Multi-stage Docker build with PostgreSQL service ready for instant local testing or production deployment.
 
 ---
@@ -81,70 +82,91 @@ docker compose up --build
 
 ---
 
-## 🎙️ Voice & Audio Pipeline (Speech-to-Text)
+## 🎙️ Multimodal Audio & Response Modality Architecture
 
-Speakivo supports Telegram voice messages as a first-class input modality. Voice messages converge into the same Language Learning Agent pipeline as text messages:
+Speakivo treats voice as a first-class citizen for both **input** (Speech-to-Text) and **output** (Text-to-Speech):
 
 ```text
-                          Telegram Voice Message
-                                    │
-                                    ▼
-                         GramIO context.download()
-                                    │ (in-memory audio buffer)
-                                    ▼
-                       OpenAISpeechToTextService
-                     (audio.transcriptions.create)
-                                    │
-                         ┌──────────┴──────────┐
-                         ▼                     ▼
-                  Empty Transcript?       Valid Transcript
-                         │                     │
-                         ▼                     ▼
-                 Retry Response         MessageProcessingService
-               (no Agent execution)            │
-                                       ┌───────┴───────┐
-                                       ▼               ▼
-                                ai_usage (STT)    conversation_messages
-                               (audio -> text)     (type = 'voice')
-                                                       │
-                                                       ▼
-                                                ContextManager
-                                                       │
-                                                       ▼
-                                             LanguageLearningAgent
-                                                       │
-                                               ┌───────┴───────┐
-                                               ▼               ▼
-                                         Learning Tools   ai_usage (Agent)
-                                               │
-                                               ▼
-                                         Text Response
-                                               │
-                                               ▼
-                                            Telegram
+                          Telegram Message (Text / Voice)
+                                       │
+                     ┌─────────────────┴─────────────────┐
+                     ▼                                   ▼
+             Text Message                        Voice Message
+                     │                                   │
+                     │                            context.download()
+                     │                                   │
+                     │                     OpenAISpeechToTextService
+                     │                    (whisper-1 / gpt-transcribe)
+                     │                                   │
+                     │                             ai_usage (STT)
+                     │                                   │
+                     └─────────────────┬─────────────────┘
+                                       ▼
+                            MessageProcessingService
+                                       │
+                              ContextManager
+                                       │
+                              LanguageLearningAgent
+                        (outputType: AgentResponseSchema)
+                                       │
+                        Structured Output: { text, modality }
+                                       │
+                            ResponseDispatcher
+                      (Modality Resolution Hierarchy)
+                                       │
+                     ┌─────────────────┴─────────────────┐
+                     ▼                                   ▼
+              final = "text"                      final = "voice"
+                     │                                   │
+                     │                       normalizeMarkdownForSpeech()
+                     │                                   │
+                     │                       OpenAITextToSpeechService
+                     │                        (gpt-4o-mini-tts / tts-1)
+                     │                                   │
+                     │                            ai_usage (TTS)
+                     │                                   │
+                     │                            ┌──────┴──────┐
+                     │                            ▼             ▼
+                     │                         Success       Failure
+                     │                            │             │
+                     │                            ▼             ▼
+                     │                    bot.api.sendVoice  context.send (fallback)
+                     │                            │             │
+                     └────────────────────────────┼─────────────┘
+                                                  ▼
+                                       conversation_messages
+                                   (type = 'text' | 'voice')
 ```
 
-### Voice Pipeline Highlights:
-- **Zero Disk I/O & Memory-Only**: Audio streams are loaded directly into memory via GramIO's `context.download()` and passed to OpenAI via `toFile()`. No temporary audio files are created on disk.
-- **Privacy-First Database Persistence**: Raw audio binary data is **never stored** in PostgreSQL. Only the validated transcript and metadata (`telegramFileId`, `durationSeconds`, `mimeType`) are saved to `conversation_messages`.
-- **Language Hints**: Active user learning language (`AgentContext.languageCode`) is automatically passed as a hint to the transcription model (`whisper-1` / `gpt-transcribe`), significantly improving accuracy on accented speech.
-- **Dual AI Usage Tracking**: Voice interactions record two distinct analytics entries in `ai_usage`:
-  1. `speech_to_text` (modality: `audio` $\to$ `text`).
-  2. `agent_response` (modality: `text` $\to$ `text`).
+### Response Modality Resolution Hierarchy:
+1. **Global Kill-Switch**: If `VOICE_REPLY_ENABLED=false` $\to$ all responses are delivered as text.
+2. **Explicit User Request**: Highest priority signal detected deterministically:
+   - *"Answer in writing"*, *"Please write the answer"*, *"Don't send audio"* $\to$ **Text**.
+   - *"Please reply with a voice message"*, *"Say it out loud"*, *"Explain verbally"* $\to$ **Voice**.
+3. **Agent Pedagogical Decision**: The AI Agent selects `modality: "voice"` when demonstrating pronunciation, phonetic sounds, or listening practice.
+4. **Input Modality Default**: Incoming voice messages reply with voice when `DEFAULT_VOICE_REPLY_TO_VOICE_MESSAGE=true`.
+5. **Application Baseline**: Default text conversation.
+
+### Multimodal Pipeline Highlights:
+- **Zero Disk I/O & Memory-Only**: Audio buffers are processed entirely in-memory using Opus format (`audio/ogg`) without temporary files or `ffmpeg` transcoding.
+- **Deterministic Markdown Normalization**: Presentation markup (`**bold**`, `*italic*`, `` `code` ``, links, lists) is stripped before speech synthesis without extra LLM overhead, preserving target words and pronunciation pauses.
+- **Graceful Text Fallback**: If the TTS provider encounters a network or quota error, the user's answer is automatically delivered as clean text without dropping the message.
+- **Granular AI Usage**: A full voice interaction records up to 3 distinct analytics entries in `ai_usage`: `speech_to_text`, `agent_response`, and `text_to_speech`.
+- **Privacy-First Persistence**: Raw binary audio is **never stored** in PostgreSQL. Only the text transcript, response text, and delivery metadata are saved.
 
 ---
 
 ## 🧪 Agent Evaluation Framework (Evals)
 
-Speakivo features a dedicated local evaluation system (`evals/`) designed to measure AI Agent quality, verify tool behavior, test database side effects, and prevent prompt regressions across **54 declarative scenarios** across 8 categories without relying on an LLM-as-a-judge.
+Speakivo features a dedicated local evaluation system (`evals/`) designed to measure AI Agent quality, verify tool behavior, test database side effects, validate response modality decisions, and prevent prompt regressions across **58 declarative scenarios** across 8 categories without relying on an LLM-as-a-judge.
 
 ### Why Evals?
 
 1. **Safe Prompt Iteration** — Modify instructions and instantly verify that the Agent still calls required learning tools on errors while avoiding unnecessary writes on chit-chat.
 2. **Mutation Precision & Unnecessary-Write Metrics** — Tracks whether state-changing tools (`record_learning_mistake`, `save_vocabulary`, `update_topic_progress`, etc.) are called with valid learning justification vs. spurious triggers.
 3. **Database Side-Effect Verification** — Asserts that actual PostgreSQL rows (`learning_mistakes`, `user_vocabulary`, `user_topic_progress`, `user_languages`) are inserted or updated correctly.
-4. **Security & Prompt Injection Testing** — Continuously asserts that unauthorized level updates, cross-user operations, and prompt injection attempts are blocked.
-5. **Token & Efficiency Monitoring** — Measures request count and token consumption per scenario to prevent tool overuse.
+4. **Modality & Intent Testing** — Validates that voice requests, written requests, and casual mentions of voice keywords trigger the correct response modality.
+5. **Security & Prompt Injection Testing** — Continuously asserts that unauthorized level updates, cross-user operations, and prompt injection attempts are blocked.
 6. **Zero Production Impact** — Each evaluation case executes with an isolated, ephemeral test user and self-cleans immediately upon completion.
 
 ### Evaluation Datasets
@@ -158,13 +180,13 @@ evals/datasets/
 ├── level-assessment.json    # 6 cases: diagnostic testing, proposals, atomic confirmations, ambiguities
 ├── security.json            # 7 cases: cross-user isolation, prompt injection, unauthorized claims
 ├── context-budget.json      # 3 cases: multi-turn efficiency, medium text, context budget limits
-└── voice.json               # 5 cases: voice conversational flow, grammar in voice, empty transcript, STT error
+└── voice.json               # 9 cases: voice flow, voice grammar, explicit written/voice overrides, negative keywords
 ```
 
 ### Running Evaluations
 
 ```bash
-# Run all 54 evaluation cases across all 8 categories
+# Run all 58 evaluation cases across all 8 categories
 npm run eval
 
 # Run category-specific evaluation suites
@@ -178,21 +200,29 @@ npm run eval:security
 npm run eval:context-budget
 
 # Filter by a specific case ID
-npm run eval -- --case voice-grammar-001
+npm run eval -- --case voice-modality-explicit-written-001
 ```
 
 ---
 
-## 💬 Example Conversation
+## 💬 Example Conversations
 
+### Voice Conversation
 ```text
 User: 🎤 [Voice Message: "Yesterday I go to the cinema with my friends."]
 
-Bot:  A small correction: **“Yesterday, I went to the cinema with my friends.”** 🎬
+Bot:  🔊 [Voice Message: "Yesterday I went to the cinema with my friends.
+                         Because yesterday refers to a finished past action, use the past tense went.
+                         What movie did you watch?"]
+```
 
-      Because **yesterday** refers to a finished past action, use the past tense of *go*: **went**.
+### Explicit Modality Override
+```text
+User: 🎤 [Voice Message: "Can you explain the difference between for and since? Please answer in writing."]
 
-      What movie did you watch?
+Bot:  💬 "Here is the difference:
+          • Use **for** with a duration of time (e.g., *for 3 years*, *for two hours*).
+          • Use **since** with a specific starting point in the past (e.g., *since 2020*, *since Monday*)."
 ```
 
 ---
@@ -208,6 +238,11 @@ All configuration is managed through environment variables and validated at star
 | `DATABASE_URL`                          | `string`  | _required_        | PostgreSQL connection string                                       |
 | `OPENAI_MODEL`                          | `string`  | `gpt-5.6-luna`    | Chat model identifier (e.g., `gpt-5.6-luna`, `gpt-4o`, `gpt-4o-mini`) |
 | `OPENAI_TRANSCRIPTION_MODEL`            | `string`  | `whisper-1`        | Speech-to-Text model (e.g., `whisper-1`, `gpt-transcribe`)          |
+| `VOICE_REPLY_ENABLED`                   | `boolean` | `true`            | Global kill-switch for voice reply synthesis                       |
+| `DEFAULT_VOICE_REPLY_TO_VOICE_MESSAGE`  | `boolean` | `true`            | Whether incoming voice messages default to voice replies           |
+| `OPENAI_TTS_MODEL`                      | `string`  | `gpt-4o-mini-tts` | Text-to-Speech model (e.g., `gpt-4o-mini-tts`, `tts-1`)            |
+| `OPENAI_TTS_VOICE`                      | `string`  | `marin`           | Text-to-Speech voice identifier (e.g., `marin`, `cedar`, `alloy`)  |
+| `OPENAI_TTS_INSTRUCTIONS`               | `string`  | _natural/warm_    | Default voice delivery and intonation instructions                 |
 | `AI_SHORT_CONTEXT_ENABLED`              | `boolean` | `true`            | Enable/disable input token budget enforcement                      |
 | `AI_SHORT_CONTEXT_MAX_INPUT_TOKENS`     | `number`  | `272000`          | Maximum allowed input tokens                                       |
 | `AI_SHORT_CONTEXT_SAFETY_MARGIN_TOKENS` | `number`  | `5000`            | Safety margin subtracted from max tokens                           |
@@ -223,11 +258,11 @@ All configuration is managed through environment variables and validated at star
 Speakivo includes a dedicated, model-agnostic AI usage layer to track resource consumption per model request:
 
 - **Separation of Concerns**: `conversation_messages` stores _what_ was communicated; `ai_usage` stores _how many tokens/resources_ were consumed.
-- **Per-Request Granularity**: If a single user message triggers an STT transcription followed by multiple LLM requests, each operation is logged as a separate row in `ai_usage`, correlated by `user_id`, `session_id`, and `message_id`.
-- **Pre-Request Estimate vs. Post-Request Actuals**:
-  - Pre-request token counting (`ContextManager`) verifies that the prompt fits within the context budget before calling the API.
-  - Post-request usage (`UsageService`) captures actual billed tokens (including cached tokens, text tokens, audio tokens) returned by the provider.
-- **Multi-Modal Support**: Supports modality fields (`input_modality`, `output_modality`) and operations (`agent_response`, `speech_to_text`, `text_to_speech`, `realtime`).
+- **Per-Request Granularity**: A full voice turn logs up to 3 discrete records:
+  1. `speech_to_text` (modality: `audio` $\to$ `text`).
+  2. `agent_response` (modality: `text` $\to$ `text`, tracking prompt/completion/cached tokens).
+  3. `text_to_speech` (modality: `text` $\to$ `audio`, tracking characters/audio metadata).
+- **Correlated Analytics**: All usage records link to `user_id`, `session_id`, and `message_id`.
 - **Resilient**: Analytics recording failures are caught and logged safely without disrupting the user's conversational experience.
 
 ---
@@ -256,7 +291,7 @@ The database uses **PostgreSQL** with **Drizzle ORM**:
 ```text
 speakivo/
 ├── evals/                       # 🧪 Agent Evaluation Framework
-│   ├── datasets/                # 54 declarative test scenarios across 8 categories
+│   ├── datasets/                # 58 declarative test scenarios across 8 categories
 │   │   ├── conversation.json
 │   │   ├── grammar.json
 │   │   ├── vocabulary.json
@@ -270,7 +305,7 @@ speakivo/
 │   │   ├── tool-arguments.ts
 │   │   ├── side-effects.ts      # Direct PostgreSQL state validator
 │   │   ├── security.ts          # Authorization & prompt injection validator
-│   │   ├── response.ts
+│   │   ├── response.ts          # Response text and modality validator
 │   │   ├── efficiency.ts
 │   │   └── index.ts
 │   ├── fixtures/
@@ -281,8 +316,8 @@ speakivo/
 │   └── types.ts                 # TypeScript schemas
 ├── src/
 │   ├── agent/
-│   │   ├── instructions.ts      # Agent system prompt & directives
-│   │   ├── language-agent.ts    # Agent definition, runner & runId generator
+│   │   ├── instructions.ts      # Agent system prompt & runtime modality directives
+│   │   ├── language-agent.ts    # Agent definition with structured AgentResponseSchema
 │   │   └── tools.ts             # 11 database-backed Agent tools
 │   ├── ai/
 │   │   └── context/
@@ -294,11 +329,14 @@ speakivo/
 │   ├── audio/
 │   │   ├── speech-to-text.service.ts # STT interface & DTO definitions
 │   │   ├── openai-speech-to-text.service.ts # Official OpenAI audio transcriptions
-│   │   └── audio.test.ts        # STT unit tests
+│   │   ├── text-to-speech.service.ts # TTS interface & DTO definitions
+│   │   ├── openai-text-to-speech.service.ts # Official OpenAI audio speech synthesis
+│   │   ├── markdown-normalizer.ts   # Deterministic Markdown cleaner for TTS
+│   │   └── text-to-speech.test.ts   # TTS and normalizer unit tests
 │   ├── bot/
 │   │   ├── bot.ts               # GramIO bot initialization & lifecycle
 │   │   └── handlers/
-│   │       └── message.ts       # Telegram message handler (text, voice routing)
+│   │       └── message.ts       # Telegram message handler (text & Opus voice dispatch)
 │   ├── config/
 │   │   └── env.ts               # Strongly-typed Zod environment configuration
 │   ├── db/
@@ -325,11 +363,13 @@ speakivo/
 │   │   ├── assessment-service.ts # Dynamic CEFR level assessment & atomic confirmation
 │   │   ├── conversation-service.ts # Sessions & message history
 │   │   ├── usage-service.ts     # Per-request AI usage recording & analytics queries
-│   │   ├── message-processing-service.ts # Unified text & voice application pipeline
-│   │   ├── message-processing.test.ts # Message processing integration tests
+│   │   ├── message-processing-service.ts # Unified application pipeline with modality resolution
+│   │   ├── message-processing.test.ts # Text & voice end-to-end integration tests
 │   │   ├── services.test.ts     # Service & database integration tests
 │   │   ├── assessment-service.test.ts # Level assessment test suite
 │   │   └── usage-service.test.ts # AI usage & analytics test suite
+│   ├── types/
+│   │   └── modality.ts          # ResponseModality & explicit request detection
 │   └── main.ts                  # Application entry point
 ```
 
@@ -338,7 +378,7 @@ speakivo/
 ## 🛠️ Development & Database Commands
 
 ```bash
-# Run Agent Evaluations (54 cases across 8 categories)
+# Run Agent Evaluations (58 cases across 8 categories)
 npm run eval
 
 # Run category-specific evaluations
@@ -351,7 +391,7 @@ npm run eval:level-assessment
 npm run eval:security
 npm run eval:context-budget
 
-# Run unit & integration tests (75 tests)
+# Run unit & integration tests (89 tests)
 npm test
 
 # Run TypeScript type check

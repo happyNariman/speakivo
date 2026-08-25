@@ -218,6 +218,7 @@ export async function setupEvalFixtures(
     languageCode: userLang.languageCode,
     level: userLang.level,
     sessionId: session.id,
+    inputModality: "text",
     userService,
     learningService,
     conversationService,

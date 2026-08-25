@@ -1,9 +1,10 @@
 [
   {
     "id": "voice-basic-001",
-    "name": "Basic conversational voice interaction",
+    "name": "Basic conversational voice interaction defaulting to voice reply",
     "category": "voice",
     "input": "Hello! I am excited to practice speaking English today.",
+    "inputModality": "voice",
     "user": {
       "languageCode": "en",
       "nativeLanguageCode": "ru",
@@ -26,7 +27,8 @@
       ],
       "response": {
         "nonEmpty": true,
-        "noRawIds": true
+        "noRawIds": true,
+        "modality": "voice"
       }
     }
   },
@@ -35,6 +37,7 @@
     "name": "Voice message with grammar error: Past Simple 'go' instead of 'went'",
     "category": "voice",
     "input": "Yesterday I go to the cinema with my friends.",
+    "inputModality": "voice",
     "user": {
       "languageCode": "en",
       "nativeLanguageCode": "ru",
@@ -64,7 +67,8 @@
       "response": {
         "nonEmpty": true,
         "containsSubstrings": ["went"],
-        "noRawIds": true
+        "noRawIds": true,
+        "modality": "voice"
       }
     }
   },
@@ -73,6 +77,7 @@
     "name": "Empty voice transcript returns retry message without calling Agent",
     "category": "voice",
     "input": "",
+    "inputModality": "voice",
     "user": {
       "languageCode": "en",
       "nativeLanguageCode": "ru",
@@ -96,7 +101,8 @@
       ],
       "response": {
         "nonEmpty": true,
-        "containsSubstrings": ["couldn't understand that voice message"]
+        "containsSubstrings": ["couldn't understand that voice message"],
+        "modality": "text"
       }
     }
   },
@@ -105,6 +111,7 @@
     "name": "STT provider failure returns safe retry message without calling Agent",
     "category": "voice",
     "input": "[STT_ERROR]",
+    "inputModality": "voice",
     "user": {
       "languageCode": "en",
       "nativeLanguageCode": "ru",
@@ -128,7 +135,8 @@
       ],
       "response": {
         "nonEmpty": true,
-        "containsSubstrings": ["couldn't understand that voice message"]
+        "containsSubstrings": ["couldn't understand that voice message"],
+        "modality": "text"
       }
     }
   },
@@ -137,6 +145,7 @@
     "name": "Multi-turn context continuation over voice",
     "category": "voice",
     "input": "Yes, I visited the Louvre Museum and loved the paintings.",
+    "inputModality": "voice",
     "user": {
       "languageCode": "en",
       "nativeLanguageCode": "ru",
@@ -171,7 +180,132 @@
       ],
       "response": {
         "nonEmpty": true,
-        "noRawIds": true
+        "noRawIds": true,
+        "modality": "voice"
+      }
+    }
+  },
+  {
+    "id": "voice-modality-explicit-written-001",
+    "name": "Voice input with explicit written request overrides voice default to text",
+    "category": "voice",
+    "input": "Can you explain the difference between for and since? Please answer in writing.",
+    "inputModality": "voice",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "voice-modality-explicit-voice-001",
+    "name": "Text input with explicit voice request overrides text default to voice",
+    "category": "voice",
+    "input": "How do you pronounce 'thoroughly'? Please reply with a voice message.",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true,
+        "modality": "voice"
+      }
+    }
+  },
+  {
+    "id": "voice-modality-text-default-001",
+    "name": "Normal text message defaults to text response modality",
+    "category": "voice",
+    "input": "What is the capital of Australia?",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "voice-modality-negative-keyword-001",
+    "name": "Casual mention of voice keyword does NOT trigger voice modality",
+    "category": "voice",
+    "input": "I prefer texting over calling, but my friend left a voice message today. Do you prefer texts or calls?",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true,
+        "modality": "text"
       }
     }
   }

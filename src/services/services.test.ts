@@ -482,6 +482,7 @@ describe("Database, Domain Services & Safe Agent Tools", () => {
         languageCode: "en",
         level: "B1",
         sessionId: testSessionId,
+        inputModality: "text",
         userService,
         learningService,
         conversationService,

@@ -18,6 +18,23 @@ const envSchema = z.object({
     .string()
     .min(1, "DATABASE_URL is required"),
 
+  // Voice & TTS Settings
+  VOICE_REPLY_ENABLED: z
+    .string()
+    .default("true")
+    .transform((val) => val === "true"),
+  DEFAULT_VOICE_REPLY_TO_VOICE_MESSAGE: z
+    .string()
+    .default("true")
+    .transform((val) => val === "true"),
+  OPENAI_TTS_MODEL: z.string().default("gpt-4o-mini-tts"),
+  OPENAI_TTS_VOICE: z.string().default("marin"),
+  OPENAI_TTS_INSTRUCTIONS: z
+    .string()
+    .default(
+      "Speak naturally, warmly, and clearly at a moderate pace suitable for a language learner.",
+    ),
+
   // AI Context Management
   AI_SHORT_CONTEXT_ENABLED: z
     .string()

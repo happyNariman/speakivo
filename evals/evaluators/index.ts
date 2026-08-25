@@ -20,6 +20,7 @@ export async function evaluateCase(
   inputTokens: number,
   outputTokens: number,
   durationMs: number,
+  actualModality?: "text" | "voice",
 ): Promise<EvalCaseResult> {
   const totalTokens = inputTokens + outputTokens;
   const failures: string[] = [];
@@ -49,8 +50,8 @@ export async function evaluateCase(
     failures.push(...securityResult.failures);
   }
 
-  // 5. Evaluate response text
-  const responseResult = evaluateResponse(evalCase, responseText);
+  // 5. Evaluate response text and modality
+  const responseResult = evaluateResponse(evalCase, responseText, actualModality);
   if (!responseResult.passed) {
     failures.push(...responseResult.failures);
   }

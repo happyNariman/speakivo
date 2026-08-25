@@ -11,6 +11,7 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(1, "TELEGRAM_BOT_TOKEN is required"),
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
   OPENAI_MODEL: z.string().default("gpt-5.6-luna"),
+  OPENAI_TRANSCRIPTION_MODEL: z.string().default("whisper-1"),
 
   // Database
   DATABASE_URL: z

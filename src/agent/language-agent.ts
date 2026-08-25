@@ -84,10 +84,29 @@ export async function runLanguageAgent(
       `rawRequests=${rawResponses.length} inputTokens=${inputTokens ?? "N/A"} outputTokens=${outputTokens ?? "N/A"}`,
   );
 
-  const responseText =
-    typeof result.finalOutput === "string"
-      ? result.finalOutput
-      : "I'm here to help you practice! What would you like to focus on next?";
+  let responseText = "";
+  if (typeof result.finalOutput === "string" && result.finalOutput.trim().length > 0) {
+    responseText = result.finalOutput.trim();
+  } else if (Array.isArray((result as any).messages)) {
+    const msgs = (result as any).messages;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const m = msgs[i];
+      if (m.role === "assistant" && Array.isArray(m.content)) {
+        const textChunk = m.content.find((c: any) => c.type === "output_text" || c.type === "text");
+        if (textChunk?.text?.trim()) {
+          responseText = textChunk.text.trim();
+          break;
+        }
+      } else if (m.role === "assistant" && typeof m.content === "string" && m.content.trim()) {
+        responseText = m.content.trim();
+        break;
+      }
+    }
+  }
+
+  if (!responseText) {
+    responseText = "I'm here to help you practice! What would you like to focus on next?";
+  }
 
   return {
     response: responseText,

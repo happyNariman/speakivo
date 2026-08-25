@@ -1,0 +1,178 @@
+[
+  {
+    "id": "voice-basic-001",
+    "name": "Basic conversational voice interaction",
+    "category": "voice",
+    "input": "Hello! I am excited to practice speaking English today.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "update_topic_progress",
+          "update_vocabulary_progress",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "voice-grammar-001",
+    "name": "Voice message with grammar error: Past Simple 'go' instead of 'went'",
+    "category": "voice",
+    "input": "Yesterday I go to the cinema with my friends.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "A2"
+    },
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake",
+            "count": 1
+          }
+        ],
+        "prohibited": [
+          "save_vocabulary",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded",
+          "details": {
+            "category": "grammar"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["went"],
+        "noRawIds": true
+      }
+    }
+  },
+  {
+    "id": "voice-empty-transcript-001",
+    "name": "Empty voice transcript returns retry message without calling Agent",
+    "category": "voice",
+    "input": "",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "update_topic_progress",
+          "update_vocabulary_progress",
+          "assess_language_level",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["couldn't understand that voice message"]
+      }
+    }
+  },
+  {
+    "id": "voice-stt-failure-001",
+    "name": "STT provider failure returns safe retry message without calling Agent",
+    "category": "voice",
+    "input": "[STT_ERROR]",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "update_topic_progress",
+          "update_vocabulary_progress",
+          "assess_language_level",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["couldn't understand that voice message"]
+      }
+    }
+  },
+  {
+    "id": "voice-context-001",
+    "name": "Multi-turn context continuation over voice",
+    "category": "voice",
+    "input": "Yes, I visited the Louvre Museum and loved the paintings.",
+    "user": {
+      "languageCode": "en",
+      "nativeLanguageCode": "ru",
+      "level": "B1"
+    },
+    "setup": {
+      "previousMessages": [
+        {
+          "role": "user",
+          "content": "I traveled to Paris last summer."
+        },
+        {
+          "role": "assistant",
+          "content": "That sounds wonderful! Did you visit any famous museums while in Paris?"
+        }
+      ]
+    },
+    "expectations": {
+      "toolCalls": {
+        "prohibited": [
+          "record_learning_mistake",
+          "save_vocabulary",
+          "update_topic_progress",
+          "update_vocabulary_progress",
+          "confirm_language_level"
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "noRawIds": true
+      }
+    }
+  }
+]

@@ -69,6 +69,7 @@ export class ConversationService {
     role: MessageRole;
     content: string;
     messageType?: MessageType;
+    metadata?: Record<string, unknown> | null;
     inputTokens?: number | null;
     outputTokens?: number | null;
   }): Promise<ConversationMessage> {
@@ -79,6 +80,7 @@ export class ConversationService {
         role: data.role,
         content: data.content,
         messageType: data.messageType ?? "text",
+        metadata: data.metadata ?? null,
         inputTokens: data.inputTokens ?? null,
         outputTokens: data.outputTokens ?? null,
       })

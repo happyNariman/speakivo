@@ -22,6 +22,13 @@
       "when": 1787480175017,
       "tag": "0002_familiar_ulik",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787649954086,
+      "tag": "0003_brave_scourge",
+      "breakpoints": true
     }
   ]
 }

@@ -1,18 +1,19 @@
 # 🌍 Speakivo — AI Language Learning Companion
 
-Speakivo is an intelligent, conversational Telegram bot that helps you practice and learn any language through natural dialogue. Powered by the **OpenAI Agents SDK**, **GramIO**, and **PostgreSQL with Drizzle ORM**, Speakivo adapts to your learning pace, explains grammar, corrects mistakes, tracks vocabulary progress, and remembers your learning history.
+Speakivo is an intelligent, conversational Telegram bot that helps you practice and learn any language through natural dialogue — both in **text** and **voice**. Powered by the **OpenAI Agents SDK**, **OpenAI Speech-to-Text**, **GramIO**, and **PostgreSQL with Drizzle ORM**, Speakivo adapts to your learning pace, explains grammar, corrects mistakes, tracks vocabulary progress, and remembers your learning history.
 
 ---
 
 ## ✨ Features
 
 - 🌐 **Learn Any Language** — Practice German, Spanish, French, Japanese, English, or any language you choose without rigid presets.
+- 🎙️ **Voice & Text Input** — Send typed text or record Telegram voice messages; speech is accurately transcribed via OpenAI Speech-to-Text and seamlessly processed by the same AI Tutor.
 - 🤖 **Conversational AI Tutor** — Engaging dialogues, polite error corrections, concise grammar explanations, and context-aware follow-up questions.
-- 🛠️ **Agentic Learning Tools** — Built-in AI tools for retrieving user profile, analyzing weak topics, reviewing vocabulary, and recording learning mistakes.
+- 🛠️ **Agentic Learning Tools** — Built-in AI tools for retrieving user profile, analyzing weak topics, reviewing vocabulary, updating practice stats, and recording learning mistakes.
 - 📈 **Dynamic CEFR Level Assessment** — Multi-dimensional diagnostic evaluation, confidence scoring, evidence collection, and atomic confirmation to keep learner proficiency up-to-date.
-- 🧪 **Agent Evaluation Framework (Evals)** — Local, deterministic test suite measuring tool selection, argument accuracy, database side effects, security invariants, and token efficiency.
-- 💾 **Persistent Learning & Sessions** — PostgreSQL database powered by Drizzle ORM storing users, language levels, topics, vocabulary, mistake history, and chat sessions.
-- 📊 **Granular AI Usage Tracking** — Dedicated analytics layer recording per-request LLM tokens (input, output, cached, modality) independently from conversation messages.
+- 🧪 **Agent Evaluation Framework (Evals)** — Local, deterministic test suite (54 test cases across 8 categories) measuring tool selection, argument accuracy, database side effects, mutation precision, security invariants, and token efficiency.
+- 💾 **Persistent Learning & Sessions** — PostgreSQL database powered by Drizzle ORM storing users, language levels, topics, vocabulary, mistake history, chat sessions, and voice metadata.
+- 📊 **Granular AI Usage Tracking** — Dedicated analytics layer recording per-request LLM and STT operations (tokens, modalities, model, run correlation) independently from conversation messages.
 - ⚡ **Smart Token & Context Management** — BPE token counter (`o200k_base` / `cl100k_base`) ensures requests stay within configured limits and eliminates context overflows.
 - 🛡️ **Type-Safe & Robust** — Built with TypeScript, GramIO, Drizzle ORM, and strict Zod runtime configuration validation.
 - 🐳 **Containerized** — Multi-stage Docker build with PostgreSQL service ready for instant local testing or production deployment.
@@ -80,48 +81,104 @@ docker compose up --build
 
 ---
 
+## 🎙️ Voice & Audio Pipeline (Speech-to-Text)
+
+Speakivo supports Telegram voice messages as a first-class input modality. Voice messages converge into the same Language Learning Agent pipeline as text messages:
+
+```text
+                          Telegram Voice Message
+                                    │
+                                    ▼
+                         GramIO context.download()
+                                    │ (in-memory audio buffer)
+                                    ▼
+                       OpenAISpeechToTextService
+                     (audio.transcriptions.create)
+                                    │
+                         ┌──────────┴──────────┐
+                         ▼                     ▼
+                  Empty Transcript?       Valid Transcript
+                         │                     │
+                         ▼                     ▼
+                 Retry Response         MessageProcessingService
+               (no Agent execution)            │
+                                       ┌───────┴───────┐
+                                       ▼               ▼
+                                ai_usage (STT)    conversation_messages
+                               (audio -> text)     (type = 'voice')
+                                                       │
+                                                       ▼
+                                                ContextManager
+                                                       │
+                                                       ▼
+                                             LanguageLearningAgent
+                                                       │
+                                               ┌───────┴───────┐
+                                               ▼               ▼
+                                         Learning Tools   ai_usage (Agent)
+                                               │
+                                               ▼
+                                         Text Response
+                                               │
+                                               ▼
+                                            Telegram
+```
+
+### Voice Pipeline Highlights:
+- **Zero Disk I/O & Memory-Only**: Audio streams are loaded directly into memory via GramIO's `context.download()` and passed to OpenAI via `toFile()`. No temporary audio files are created on disk.
+- **Privacy-First Database Persistence**: Raw audio binary data is **never stored** in PostgreSQL. Only the validated transcript and metadata (`telegramFileId`, `durationSeconds`, `mimeType`) are saved to `conversation_messages`.
+- **Language Hints**: Active user learning language (`AgentContext.languageCode`) is automatically passed as a hint to the transcription model (`whisper-1` / `gpt-transcribe`), significantly improving accuracy on accented speech.
+- **Dual AI Usage Tracking**: Voice interactions record two distinct analytics entries in `ai_usage`:
+  1. `speech_to_text` (modality: `audio` $\to$ `text`).
+  2. `agent_response` (modality: `text` $\to$ `text`).
+
+---
+
 ## 🧪 Agent Evaluation Framework (Evals)
 
-Speakivo features a dedicated local evaluation system (`evals/`) designed to measure AI Agent quality, verify tool behavior, test database side effects, and prevent prompt regressions across **44 declarative scenarios** without relying on an LLM-as-a-judge.
+Speakivo features a dedicated local evaluation system (`evals/`) designed to measure AI Agent quality, verify tool behavior, test database side effects, and prevent prompt regressions across **54 declarative scenarios** across 8 categories without relying on an LLM-as-a-judge.
 
 ### Why Evals?
 
-1. **Safe Prompt Iteration** — Modify instructions and instantly verify that the Agent still calls required learning tools on errors.
-2. **Database Side-Effect Verification** — Asserts that actual PostgreSQL rows (`learning_mistakes`, `user_vocabulary`, `user_topic_progress`, `user_languages`) are inserted or updated correctly.
-3. **Security & Prompt Injection Testing** — Continuously asserts that unauthorized level updates, cross-user operations, and prompt injection attempts are blocked.
-4. **Token & Efficiency Monitoring** — Measures request count and token consumption per scenario to prevent tool overuse.
-5. **Zero Production Impact** — Each evaluation case executes with an isolated, ephemeral test user and self-cleans immediately upon completion.
+1. **Safe Prompt Iteration** — Modify instructions and instantly verify that the Agent still calls required learning tools on errors while avoiding unnecessary writes on chit-chat.
+2. **Mutation Precision & Unnecessary-Write Metrics** — Tracks whether state-changing tools (`record_learning_mistake`, `save_vocabulary`, `update_topic_progress`, etc.) are called with valid learning justification vs. spurious triggers.
+3. **Database Side-Effect Verification** — Asserts that actual PostgreSQL rows (`learning_mistakes`, `user_vocabulary`, `user_topic_progress`, `user_languages`) are inserted or updated correctly.
+4. **Security & Prompt Injection Testing** — Continuously asserts that unauthorized level updates, cross-user operations, and prompt injection attempts are blocked.
+5. **Token & Efficiency Monitoring** — Measures request count and token consumption per scenario to prevent tool overuse.
+6. **Zero Production Impact** — Each evaluation case executes with an isolated, ephemeral test user and self-cleans immediately upon completion.
 
 ### Evaluation Datasets
 
 ```text
 evals/datasets/
 ├── conversation.json        # 6 cases: casual chit-chat (asserts NO write tools are called)
-├── grammar.json             # 8 cases: tenses, 3rd person -s, irregulars, prepositions, double negatives
-├── vocabulary.json          # 7 cases: word definitions, saving vocabulary, practice, false friends
+├── grammar.json             # 11 cases: tenses, 3rd person -s, irregulars, prepositions, quotes vs real errors
+├── vocabulary.json          # 9 cases: definitions, saving vocabulary, practice, false friends, known words
 ├── learning-state.json      # 7 cases: profile queries, progress stats, weak topics, practice updates
 ├── level-assessment.json    # 6 cases: diagnostic testing, proposals, atomic confirmations, ambiguities
 ├── security.json            # 7 cases: cross-user isolation, prompt injection, unauthorized claims
-└── context-budget.json      # 3 cases: multi-turn efficiency, medium text, context budget limits
+├── context-budget.json      # 3 cases: multi-turn efficiency, medium text, context budget limits
+└── voice.json               # 5 cases: voice conversational flow, grammar in voice, empty transcript, STT error
 ```
 
 ### Running Evaluations
 
 ```bash
-# Run all 44 evaluation cases
+# Run all 54 evaluation cases across all 8 categories
 npm run eval
 
 # Run category-specific evaluation suites
-npm run eval:conversation
+npm run eval:voice
 npm run eval:grammar
 npm run eval:vocabulary
+npm run eval:conversation
 npm run eval:learning-state
 npm run eval:level-assessment
 npm run eval:security
 npm run eval:context-budget
 
 # Filter by a specific case ID
-npm run eval -- --case grammar-001-past-simple-go
+npm run eval -- --case voice-grammar-001
 ```
 
 ---
@@ -129,20 +186,13 @@ npm run eval -- --case grammar-001-past-simple-go
 ## 💬 Example Conversation
 
 ```text
-User: Hi! I want to learn German.
+User: 🎤 [Voice Message: "Yesterday I go to the cinema with my friends."]
 
-Bot:  Great choice! German is a wonderful language. 🇩🇪
-      Let's start with a simple greeting.
-      "Hallo!" means "Hello!" in German.
-      Can you try saying "Guten Tag" (Good day)?
+Bot:  A small correction: **“Yesterday, I went to the cinema with my friends.”** 🎬
 
-User: Guten Tag! Wie geht es Ihnen?
+      Because **yesterday** refers to a finished past action, use the past tense of *go*: **went**.
 
-Bot:  Sehr gut! 👏 Your phrasing is spot on.
-      "Wie geht es Ihnen?" is the polite/formal way to ask "How are you?".
-      For friends, you can simply say "Wie geht's?".
-      Mir geht es gut, danke! (I'm doing well, thanks!)
-      What topic would you like to explore next?
+      What movie did you watch?
 ```
 
 ---
@@ -151,19 +201,20 @@ Bot:  Sehr gut! 👏 Your phrasing is spot on.
 
 All configuration is managed through environment variables and validated at startup via Zod:
 
-| Variable                                | Type      | Default           | Description                                                      |
-| --------------------------------------- | --------- | ----------------- | ---------------------------------------------------------------- |
-| `TELEGRAM_BOT_TOKEN`                    | `string`  | _required_        | Telegram Bot token from @BotFather                               |
-| `OPENAI_API_KEY`                        | `string`  | _required_        | OpenAI API key                                                   |
-| `DATABASE_URL`                          | `string`  | _required_        | PostgreSQL connection string                                     |
-| `OPENAI_MODEL`                          | `string`  | `gpt-5.6-luna`    | Model identifier (e.g., `gpt-5.6-luna`, `gpt-4o`, `gpt-4o-mini`) |
-| `AI_SHORT_CONTEXT_ENABLED`              | `boolean` | `true`            | Enable/disable input token budget enforcement                    |
-| `AI_SHORT_CONTEXT_MAX_INPUT_TOKENS`     | `number`  | `272000`          | Maximum allowed input tokens                                     |
-| `AI_SHORT_CONTEXT_SAFETY_MARGIN_TOKENS` | `number`  | `5000`            | Safety margin subtracted from max tokens                         |
-| `AI_SHORT_CONTEXT_STRATEGY`             | `string`  | `truncate_oldest` | Context reduction strategy when exceeding budget                 |
-| `LANGUAGE_LEVEL_ASSESSMENT_ENABLED`     | `boolean` | `true`            | Enable/disable dynamic language level assessment                 |
-| `LANGUAGE_LEVEL_MIN_CONFIDENCE`         | `number`  | `0.75`            | Minimum confidence threshold for level proposals                 |
-| `LANGUAGE_LEVEL_MIN_EVIDENCE`           | `number`  | `5`               | Minimum evidence items required for level proposals              |
+| Variable                                | Type      | Default           | Description                                                        |
+| --------------------------------------- | --------- | ----------------- | ------------------------------------------------------------------ |
+| `TELEGRAM_BOT_TOKEN`                    | `string`  | _required_        | Telegram Bot token from @BotFather                                 |
+| `OPENAI_API_KEY`                        | `string`  | _required_        | OpenAI API key                                                     |
+| `DATABASE_URL`                          | `string`  | _required_        | PostgreSQL connection string                                       |
+| `OPENAI_MODEL`                          | `string`  | `gpt-5.6-luna`    | Chat model identifier (e.g., `gpt-5.6-luna`, `gpt-4o`, `gpt-4o-mini`) |
+| `OPENAI_TRANSCRIPTION_MODEL`            | `string`  | `whisper-1`        | Speech-to-Text model (e.g., `whisper-1`, `gpt-transcribe`)          |
+| `AI_SHORT_CONTEXT_ENABLED`              | `boolean` | `true`            | Enable/disable input token budget enforcement                      |
+| `AI_SHORT_CONTEXT_MAX_INPUT_TOKENS`     | `number`  | `272000`          | Maximum allowed input tokens                                       |
+| `AI_SHORT_CONTEXT_SAFETY_MARGIN_TOKENS` | `number`  | `5000`            | Safety margin subtracted from max tokens                           |
+| `AI_SHORT_CONTEXT_STRATEGY`             | `string`  | `truncate_oldest` | Context reduction strategy when exceeding budget                   |
+| `LANGUAGE_LEVEL_ASSESSMENT_ENABLED`     | `boolean` | `true`            | Enable/disable dynamic language level assessment                   |
+| `LANGUAGE_LEVEL_MIN_CONFIDENCE`         | `number`  | `0.75`            | Minimum confidence threshold for level proposals                   |
+| `LANGUAGE_LEVEL_MIN_EVIDENCE`           | `number`  | `5`               | Minimum evidence items required for level proposals                |
 
 ---
 
@@ -172,11 +223,11 @@ All configuration is managed through environment variables and validated at star
 Speakivo includes a dedicated, model-agnostic AI usage layer to track resource consumption per model request:
 
 - **Separation of Concerns**: `conversation_messages` stores _what_ was communicated; `ai_usage` stores _how many tokens/resources_ were consumed.
-- **Per-Request Granularity**: If a single user message triggers multiple LLM requests (e.g., calling tools then responding), each request is logged as a separate row in `ai_usage`, correlated by `run_id`.
+- **Per-Request Granularity**: If a single user message triggers an STT transcription followed by multiple LLM requests, each operation is logged as a separate row in `ai_usage`, correlated by `user_id`, `session_id`, and `message_id`.
 - **Pre-Request Estimate vs. Post-Request Actuals**:
   - Pre-request token counting (`ContextManager`) verifies that the prompt fits within the context budget before calling the API.
   - Post-request usage (`UsageService`) captures actual billed tokens (including cached tokens, text tokens, audio tokens) returned by the provider.
-- **Voice-Ready**: Supports modality fields (`input_modality`, `output_modality`) and operations (`agent_response`, `speech_to_text`, `text_to_speech`, `realtime`) for seamless future audio support.
+- **Multi-Modal Support**: Supports modality fields (`input_modality`, `output_modality`) and operations (`agent_response`, `speech_to_text`, `text_to_speech`, `realtime`).
 - **Resilient**: Analytics recording failures are caught and logged safely without disrupting the user's conversational experience.
 
 ---
@@ -195,48 +246,8 @@ The database uses **PostgreSQL** with **Drizzle ORM**:
 8. **`learning_mistakes`** — Log of user mistakes with explanations and linked topics/vocab.
 9. **`language_level_assessments`** — Diagnostic level proposals, evidence arrays, confidence scores, and status lifecycle (`pending`, `confirmed`, `rejected`, `expired`).
 10. **`learning_sessions`** — Learning sessions tracking user practice intervals.
-11. **`conversation_messages`** — History of user, assistant, system, and tool messages.
+11. **`conversation_messages`** — History of user, assistant, system, and tool messages with `message_type` (`text`, `voice`, `tool`) and JSONB `metadata`.
 12. **`ai_usage`** — Per-request AI resource metrics (input/output/cached tokens, modality, model, run correlation).
-
----
-
-## 🏗️ Architecture
-
-```text
-                         Telegram User
-                               │
-                             GramIO
-                               │
-                       Application Layer
-                (Find/Create User, Active Language)
-                               │
-                   ┌───────────┴───────────┐
-                   ▼                       ▼
-            Context Manager          User Context
-           (Pre-request Check)    (User & Services)
-                   │                       │
-                   └───────────┬───────────┘
-                               ▼
-                    Language Learning Agent
-                               │
-                     ┌─────────┴─────────┐
-                     ▼                   ▼
-                Agent Tools          OpenAI API
-            (Learning Services)          │
-                                         ▼
-                                   Model Responses
-                                   (Actual Usage)
-                                         │
-                                         ▼
-                                    UsageService
-                                         │
-                                         ▼
-                                     PostgreSQL
-                         ┌───────────────┴───────────────┐
-                         │                               │
-                  learning data                      ai_usage
-                  conversations                     analytics
-```
 
 ---
 
@@ -245,14 +256,15 @@ The database uses **PostgreSQL** with **Drizzle ORM**:
 ```text
 speakivo/
 ├── evals/                       # 🧪 Agent Evaluation Framework
-│   ├── datasets/                # 44 declarative test scenarios across 7 categories
+│   ├── datasets/                # 54 declarative test scenarios across 8 categories
 │   │   ├── conversation.json
 │   │   ├── grammar.json
 │   │   ├── vocabulary.json
 │   │   ├── learning-state.json
 │   │   ├── level-assessment.json
 │   │   ├── security.json
-│   │   └── context-budget.json
+│   │   ├── context-budget.json
+│   │   └── voice.json
 │   ├── evaluators/              # Deterministic evaluation checkers
 │   │   ├── tool-calls.ts
 │   │   ├── tool-arguments.ts
@@ -279,10 +291,14 @@ speakivo/
 │   │       ├── context-strategy.ts # Context reduction strategies
 │   │       ├── context-manager.ts  # Context manager orchestrator
 │   │       └── context-manager.test.ts # Unit test suite
+│   ├── audio/
+│   │   ├── speech-to-text.service.ts # STT interface & DTO definitions
+│   │   ├── openai-speech-to-text.service.ts # Official OpenAI audio transcriptions
+│   │   └── audio.test.ts        # STT unit tests
 │   ├── bot/
 │   │   ├── bot.ts               # GramIO bot initialization & lifecycle
 │   │   └── handlers/
-│   │       └── message.ts       # Telegram routing, persistence & usage recording
+│   │       └── message.ts       # Telegram message handler (text, voice routing)
 │   ├── config/
 │   │   └── env.ts               # Strongly-typed Zod environment configuration
 │   ├── db/
@@ -309,6 +325,8 @@ speakivo/
 │   │   ├── assessment-service.ts # Dynamic CEFR level assessment & atomic confirmation
 │   │   ├── conversation-service.ts # Sessions & message history
 │   │   ├── usage-service.ts     # Per-request AI usage recording & analytics queries
+│   │   ├── message-processing-service.ts # Unified text & voice application pipeline
+│   │   ├── message-processing.test.ts # Message processing integration tests
 │   │   ├── services.test.ts     # Service & database integration tests
 │   │   ├── assessment-service.test.ts # Level assessment test suite
 │   │   └── usage-service.test.ts # AI usage & analytics test suite
@@ -320,15 +338,20 @@ speakivo/
 ## 🛠️ Development & Database Commands
 
 ```bash
-# Run Agent Evaluations (44 cases)
+# Run Agent Evaluations (54 cases across 8 categories)
 npm run eval
 
 # Run category-specific evaluations
+npm run eval:voice
 npm run eval:grammar
-npm run eval:security
+npm run eval:vocabulary
+npm run eval:conversation
+npm run eval:learning-state
 npm run eval:level-assessment
+npm run eval:security
+npm run eval:context-budget
 
-# Run unit & integration tests
+# Run unit & integration tests (75 tests)
 npm test
 
 # Run TypeScript type check

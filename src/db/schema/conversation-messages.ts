@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, integer, jsonb, index } from "drizzle-orm/pg-core";
 import { learningSessions } from "./learning-sessions.js";
 
 export const conversationMessages = pgTable(
@@ -15,6 +15,7 @@ export const conversationMessages = pgTable(
       .notNull()
       .default("text"),
     content: text("content").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
     createdAt: timestamp("created_at", { withTimezone: true })

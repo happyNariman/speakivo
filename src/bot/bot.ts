@@ -43,8 +43,26 @@ export function createBot(): Bot {
         return await context.send(welcomeMessage);
       }
     })
-    .onStart(({ info }) => {
+    .onStart(async ({ info }) => {
       console.log(`[bot] @${info.username} started (long polling)`);
+
+      if (env.ADMIN_TELEGRAM_ID) {
+        try {
+          await bot.api.sendMessage({
+            chat_id: env.ADMIN_TELEGRAM_ID,
+            text: `🚀 <b>Speakivo Bot (@${info.username}) has been successfully started!</b>`,
+            parse_mode: "HTML",
+          });
+          console.log(
+            `[bot] start notification sent to admin (${env.ADMIN_TELEGRAM_ID})`,
+          );
+        } catch (adminNotifyErr) {
+          console.warn(
+            `[bot] failed to send start notification to admin (${env.ADMIN_TELEGRAM_ID}):`,
+            adminNotifyErr,
+          );
+        }
+      }
     })
     .onStop(() => {
       console.log("[bot] stopped");

@@ -1,0 +1,79 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ----------------------------------------------------
+  # 1. CI: Typecheck & Production Build
+  # ----------------------------------------------------
+  ci:
+    name: Typecheck & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript Typecheck
+        run: npm run typecheck
+
+      - name: Production Build
+        run: npm run build
+
+  # ----------------------------------------------------
+  # 2. CD: Automated Deployment to VPS srv-01 via SSH
+  # ----------------------------------------------------
+  deploy:
+    name: Deploy to srv-01
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            echo "🚀 Starting Speakivo deployment on srv-01..."
+
+            # Navigate to project working directory on the server
+            PROJECT_DIR="${{ secrets.PROJECT_PATH || '/opt/speakivo' }}"
+            if [ ! -d "$PROJECT_DIR" ]; then
+              PROJECT_DIR="$HOME/speakivo"
+            fi
+
+            echo "📁 Working directory: $PROJECT_DIR"
+            cd "$PROJECT_DIR"
+
+            # Fetch latest changes from main branch
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Build and recreate Docker containers in detached mode
+            docker compose build
+            docker compose up -d
+
+            # Run automatic Drizzle database migrations inside the container
+            docker compose exec -T language-agent node dist/db/migrate.js || true
+
+            # Prune dangling/unused Docker images to conserve disk space
+            docker image prune -f
+
+            echo "✅ Deployment completed successfully!"

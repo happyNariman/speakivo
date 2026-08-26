@@ -9,6 +9,10 @@ try {
 
 const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(1, "TELEGRAM_BOT_TOKEN is required"),
+  ADMIN_TELEGRAM_ID: z.preprocess(
+    (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
+    z.coerce.number().int().positive().optional(),
+  ),
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
   OPENAI_MODEL: z.string().default("gpt-5.6-luna"),
   OPENAI_TRANSCRIPTION_MODEL: z.string().default("whisper-1"),

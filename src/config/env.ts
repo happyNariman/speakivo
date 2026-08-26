@@ -14,6 +14,8 @@ const envSchema = z.object({
     z.coerce.number().int().positive().optional(),
   ),
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
+  OPENAI_ADMIN_API_KEY: z.string().optional(),
+  OPENAI_PROJECT_ID: z.string().optional(),
   OPENAI_MODEL: z.string().default("gpt-5.6-luna"),
   OPENAI_TRANSCRIPTION_MODEL: z.string().default("whisper-1"),
 

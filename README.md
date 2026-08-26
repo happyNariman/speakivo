@@ -234,7 +234,9 @@ All configuration is managed through environment variables and validated at star
 | Variable                                | Type      | Default           | Description                                                        |
 | --------------------------------------- | --------- | ----------------- | ------------------------------------------------------------------ |
 | `TELEGRAM_BOT_TOKEN`                    | `string`  | _required_        | Telegram Bot token from @BotFather                                 |
+| `ADMIN_TELEGRAM_ID`                     | `number`  | _optional_        | Admin Telegram user ID to receive startup notifications and `/status` |
 | `OPENAI_API_KEY`                        | `string`  | _required_        | OpenAI API key                                                     |
+| `OPENAI_ADMIN_API_KEY`                  | `string`  | _optional_        | OpenAI Admin API key (`sk-admin-...`) for live billed dollar costs in `/status` |
 | `DATABASE_URL`                          | `string`  | _required_        | PostgreSQL connection string                                       |
 | `OPENAI_MODEL`                          | `string`  | `gpt-5.6-luna`    | Chat model identifier (e.g., `gpt-5.6-luna`, `gpt-4o`, `gpt-4o-mini`) |
 | `OPENAI_TRANSCRIPTION_MODEL`            | `string`  | `whisper-1`        | Speech-to-Text model (e.g., `whisper-1`, `gpt-transcribe`)          |

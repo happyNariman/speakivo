@@ -327,4 +327,22 @@ describe("AI Usage Tracking & Analytics", () => {
       }
     });
   });
+
+  // 7. System-wide usage summary
+  describe("System Usage Summary", () => {
+    it("getSystemUsageSummary should aggregate system-wide metrics", async () => {
+      const summary = await usageService.getSystemUsageSummary();
+      assert.ok(typeof summary.totalRequests === "number");
+      assert.ok(summary.totalRequests > 0);
+      assert.ok(typeof summary.totalTokens === "number");
+      assert.ok(summary.totalTokens > 0);
+      assert.ok(summary.activeUsers >= 1);
+    });
+
+    it("getSystemUsageSummary with days filter should filter by date", async () => {
+      const summary1d = await usageService.getSystemUsageSummary(1);
+      assert.ok(typeof summary1d.totalRequests === "number");
+      assert.ok(summary1d.totalRequests >= 0);
+    });
+  });
 });

@@ -421,6 +421,57 @@ export class UsageService {
       .orderBy(desc(aiUsage.createdAt))
       .limit(options?.limit ?? 50);
   }
+
+  /**
+   * Retrieves aggregated system-wide AI usage statistics for admin reporting over a given period.
+   */
+  async getSystemUsageSummary(days?: number): Promise<{
+    days?: number;
+    totalRequests: number;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    cachedInputTokens: number;
+    sttRequests: number;
+    ttsRequests: number;
+    activeUsers: number;
+  }> {
+    const conditions = [];
+
+    if (days !== undefined && days > 0) {
+      const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      conditions.push(gte(aiUsage.createdAt, fromDate));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [totals] = await this.database
+      .select({
+        totalRequests: sql<number>`count(*)::int`,
+        inputTokens: sql<number>`coalesce(sum(${aiUsage.inputTokens}), 0)::bigint`,
+        outputTokens: sql<number>`coalesce(sum(${aiUsage.outputTokens}), 0)::bigint`,
+        totalTokens: sql<number>`coalesce(sum(${aiUsage.totalTokens}), 0)::bigint`,
+        cachedInputTokens: sql<number>`coalesce(sum(${aiUsage.cachedInputTokens}), 0)::bigint`,
+        sttRequests: sql<number>`count(*) filter (where ${aiUsage.operation} = 'speech_to_text')::int`,
+        ttsRequests: sql<number>`count(*) filter (where ${aiUsage.operation} = 'text_to_speech')::int`,
+        activeUsers: sql<number>`count(distinct ${aiUsage.userId})::int`,
+      })
+      .from(aiUsage)
+      .where(whereClause);
+
+    return {
+      days,
+      totalRequests: Number(totals?.totalRequests ?? 0),
+      inputTokens: Number(totals?.inputTokens ?? 0),
+      outputTokens: Number(totals?.outputTokens ?? 0),
+      totalTokens: Number(totals?.totalTokens ?? 0),
+      cachedInputTokens: Number(totals?.cachedInputTokens ?? 0),
+      sttRequests: Number(totals?.sttRequests ?? 0),
+      ttsRequests: Number(totals?.ttsRequests ?? 0),
+      activeUsers: Number(totals?.activeUsers ?? 0),
+    };
+  }
 }
 
 export const usageService = new UsageService();
+

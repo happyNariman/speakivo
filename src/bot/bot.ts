@@ -2,6 +2,7 @@ import { Bot } from "gramio";
 import { markdownToFormattable } from "@gramio/format/markdown";
 import { env } from "../config/env.js";
 import { registerMessageHandler } from "./handlers/message.js";
+import { registerStatusHandler } from "./handlers/status.js";
 import { userService } from "../services/user-service.js";
 import { learningService } from "../services/learning-service.js";
 
@@ -79,6 +80,7 @@ export function createBot(): Bot {
       }
     });
 
+  registerStatusHandler(bot);
   registerMessageHandler(bot);
 
   return bot;

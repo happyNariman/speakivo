@@ -40,12 +40,24 @@ export type SecurityExpectation = {
   promptInjectionBlocked?: boolean;
 };
 
+export type ContinuationType =
+  | "continue_activity"
+  | "transition_topic"
+  | "offer_options"
+  | "natural_completion";
+
+export type ContinuationExpectation = {
+  expectsContinuation?: boolean;
+  expectedType?: ContinuationType;
+};
+
 export type ResponseExpectation = {
   nonEmpty?: boolean;
   containsSubstrings?: string[];
   notContainsSubstrings?: string[];
   noRawIds?: boolean; // ensure raw UUIDs/secrets not printed to user
   modality?: "text" | "voice";
+  continuation?: ContinuationExpectation;
 };
 
 export type EfficiencyExpectation = {
@@ -104,7 +116,8 @@ export type EvalCase = {
     | "level-assessment"
     | "security"
     | "context-budget"
-    | "voice";
+    | "voice"
+    | "continuation";
   input: string;
   inputModality?: "text" | "voice";
   user: {
@@ -114,6 +127,8 @@ export type EvalCase = {
     levelSource?: "default" | "self_reported" | "assessed" | "confirmed";
   };
   setup?: EvalSetup;
+  expectsContinuation?: boolean;
+  expectedContinuationType?: ContinuationType;
   expectations: {
     toolCalls?: {
       required?: ExpectedToolCall[];
@@ -144,7 +159,10 @@ export type EvalCaseResult = {
   sideEffectAccuracy: boolean;
   securityPass: boolean;
   responsePass: boolean;
+  continuationPass: boolean;
   efficiencyPass: boolean;
+  detectedContinuation?: boolean;
+  detectedContinuationType?: ContinuationType;
   validWrites: number;
   unnecessaryWrites: number;
   requests: number;
@@ -168,6 +186,13 @@ export type CategoryMetrics = {
   argumentAccuracy: number;
   sideEffectAccuracy: number;
   securityPassRate: number;
+  continuationAccuracy: number;
+  forcedContinuationRate: number;
+  expectedContinuationCases: number;
+  correctContinuations: number;
+  expectedCompletionCases: number;
+  correctCompletions: number;
+  forcedContinuationCases: number;
   mutationPrecision: number;
   unnecessaryWriteRate: number;
   avgRequests: number;
@@ -185,6 +210,13 @@ export type EvalReport = {
   overallArgumentAccuracy: number;
   overallSideEffectAccuracy: number;
   overallSecurityPassRate: number;
+  overallContinuationAccuracy: number;
+  overallForcedContinuationRate: number;
+  expectedContinuationCases: number;
+  correctContinuations: number;
+  expectedCompletionCases: number;
+  correctCompletions: number;
+  forcedContinuationCases: number;
   overallMutationPrecision: number;
   overallUnnecessaryWriteRate: number;
   avgRequests: number;
@@ -196,3 +228,4 @@ export type EvalReport = {
   results: EvalCaseResult[];
   failedCasesList: string[];
 };
+

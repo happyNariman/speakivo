@@ -10,6 +10,7 @@ import { evaluateSideEffects } from "./side-effects.js";
 import { evaluateSecurity } from "./security.js";
 import { evaluateResponse } from "./response.js";
 import { evaluateEfficiency } from "./efficiency.js";
+import { evaluateContinuation } from "./continuation.js";
 
 export async function evaluateCase(
   evalCase: EvalCase,
@@ -56,7 +57,16 @@ export async function evaluateCase(
     failures.push(...responseResult.failures);
   }
 
-  // 6. Evaluate efficiency
+  // 6. Evaluate conversational continuation & engagement
+  const continuationResult = evaluateContinuation(responseText, evalCase);
+  if (!continuationResult.passed) {
+    failures.push(...continuationResult.failures);
+  }
+  if (continuationResult.warnings.length > 0) {
+    warnings.push(...continuationResult.warnings);
+  }
+
+  // 7. Evaluate efficiency
   const efficiencyResult = evaluateEfficiency(evalCase, requests, totalTokens);
   if (!efficiencyResult.passed) {
     failures.push(...efficiencyResult.failures);
@@ -74,7 +84,10 @@ export async function evaluateCase(
     sideEffectAccuracy: sideEffectResult.passed,
     securityPass: securityResult.passed,
     responsePass: responseResult.passed,
+    continuationPass: continuationResult.passed,
     efficiencyPass: efficiencyResult.passed,
+    detectedContinuation: continuationResult.detectedContinuation,
+    detectedContinuationType: continuationResult.detectedType,
     validWrites: toolResult.validWrites,
     unnecessaryWrites: toolResult.unnecessaryWrites,
     requests,

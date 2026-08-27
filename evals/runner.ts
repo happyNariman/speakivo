@@ -2,10 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Agent, run, tool, type ModelResponse } from "@openai/agents";
 import { env } from "../src/config/env.js";
-import {
-  LANGUAGE_TUTOR_INSTRUCTIONS,
-  getAgentInstructions,
-} from "../src/agent/instructions.js";
+import { getAgentInstructions } from "../src/agent/instructions.js";
 import { agentTools } from "../src/agent/tools.js";
 import {
   contextManager,
@@ -166,7 +163,7 @@ export class EvalRunner {
 
         // 6. Apply Context Management
         const contextResult = contextManager.prepare(inputItems, {
-          instructions: LANGUAGE_TUTOR_INSTRUCTIONS,
+          instructions: getAgentInstructions({ context: fixture.agentContext }),
           userId: fixture.agentContext.userId,
         });
 
@@ -386,9 +383,49 @@ export class EvalRunner {
         ? results.reduce((a, b) => a + b.totalTokens, 0) / totalCases
         : 0;
 
+    // Continuation metrics across all cases
+    let expectedContinuationCases = 0;
+    let correctContinuations = 0;
+    let expectedCompletionCases = 0;
+    let correctCompletions = 0;
+    let forcedContinuationCases = 0;
+
+    for (let i = 0; i < cases.length; i++) {
+      const c = cases[i];
+      const r = results[i];
+      const expectsContinuation =
+        c.expectsContinuation ??
+        c.expectations.response?.continuation?.expectsContinuation;
+
+      if (expectsContinuation === true) {
+        expectedContinuationCases++;
+        if (r.continuationPass) {
+          correctContinuations++;
+        }
+      } else if (expectsContinuation === false) {
+        expectedCompletionCases++;
+        if (r.continuationPass) {
+          correctCompletions++;
+        } else {
+          forcedContinuationCases++;
+        }
+      }
+    }
+
+    const totalContinuationRelevant = expectedContinuationCases + expectedCompletionCases;
+    const overallContinuationAccuracy =
+      totalContinuationRelevant > 0
+        ? ((correctContinuations + correctCompletions) / totalContinuationRelevant) * 100
+        : 100;
+    const overallForcedContinuationRate =
+      expectedCompletionCases > 0
+        ? (forcedContinuationCases / expectedCompletionCases) * 100
+        : 0;
+
     // Group metrics by category
     const categories = Array.from(new Set(results.map((r) => r.category)));
     const categoryMetrics: CategoryMetrics[] = categories.map((cat) => {
+      const catCases = cases.filter((c) => c.category === cat);
       const catResults = results.filter((r) => r.category === cat);
       const catTotal = catResults.length;
       const catPassed = catResults.filter((r) => r.passed).length;
@@ -405,6 +442,35 @@ export class EvalRunner {
         catMutations > 0 ? (catValidWrites / catMutations) * 100 : 100;
       const unnecessaryWriteRate =
         catTotal > 0 ? (catUnnecessaryWrites / catTotal) * 100 : 0;
+
+      let catExpectedCont = 0;
+      let catCorrectCont = 0;
+      let catExpectedComp = 0;
+      let catCorrectComp = 0;
+      let catForcedCont = 0;
+
+      for (let i = 0; i < catCases.length; i++) {
+        const c = catCases[i];
+        const r = catResults[i];
+        const expectsCont =
+          c.expectsContinuation ??
+          c.expectations.response?.continuation?.expectsContinuation;
+
+        if (expectsCont === true) {
+          catExpectedCont++;
+          if (r?.continuationPass) catCorrectCont++;
+        } else if (expectsCont === false) {
+          catExpectedComp++;
+          if (r?.continuationPass) catCorrectComp++;
+          else catForcedCont++;
+        }
+      }
+
+      const catRel = catExpectedCont + catExpectedComp;
+      const catContinuationAccuracy =
+        catRel > 0 ? ((catCorrectCont + catCorrectComp) / catRel) * 100 : 100;
+      const catForcedContinuationRate =
+        catExpectedComp > 0 ? (catForcedCont / catExpectedComp) * 100 : 0;
 
       return {
         category: cat,
@@ -431,6 +497,13 @@ export class EvalRunner {
           catTotal > 0
             ? (catResults.filter((r) => r.securityPass).length / catTotal) * 100
             : 0,
+        continuationAccuracy: catContinuationAccuracy,
+        forcedContinuationRate: catForcedContinuationRate,
+        expectedContinuationCases: catExpectedCont,
+        correctContinuations: catCorrectCont,
+        expectedCompletionCases: catExpectedComp,
+        correctCompletions: catCorrectComp,
+        forcedContinuationCases: catForcedCont,
         mutationPrecision,
         unnecessaryWriteRate,
         avgRequests:
@@ -465,6 +538,13 @@ export class EvalRunner {
       overallArgumentAccuracy,
       overallSideEffectAccuracy,
       overallSecurityPassRate,
+      overallContinuationAccuracy,
+      overallForcedContinuationRate,
+      expectedContinuationCases,
+      correctContinuations,
+      expectedCompletionCases,
+      correctCompletions,
+      forcedContinuationCases,
       overallMutationPrecision,
       overallUnnecessaryWriteRate,
       avgRequests,

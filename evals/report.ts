@@ -79,6 +79,16 @@ export function formatEvalReport(report: EvalReport, categoryFilter?: string): s
   lines.push(`  • Unnecessary-write rate:     ${report.overallUnnecessaryWriteRate.toFixed(1)}%`);
   lines.push("");
 
+  // Continuation & Engagement Metrics
+  lines.push(`${BOLD}Continuation & Engagement Metrics:${RESET}`);
+  lines.push(
+    `  • Continuation accuracy:      ${report.overallContinuationAccuracy.toFixed(1)}% (${report.correctContinuations}/${report.expectedContinuationCases} continuations, ${report.correctCompletions}/${report.expectedCompletionCases} sign-offs)`,
+  );
+  lines.push(
+    `  • Forced continuation rate:   ${report.overallForcedContinuationRate.toFixed(1)}% (${report.forcedContinuationCases} unexpected forced questions)`,
+  );
+  lines.push("");
+
   // Efficiency Metrics
   lines.push(`${BOLD}Efficiency Metrics (Averages per Case):${RESET}`);
   lines.push(`  • Average requests:       ${report.avgRequests.toFixed(1)}`);

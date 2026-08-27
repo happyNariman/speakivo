@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Agent, run, type ModelResponse } from "@openai/agents";
 import { z } from "zod";
 import { env } from "../config/env.js";
-import {
-  LANGUAGE_TUTOR_INSTRUCTIONS,
-  getAgentInstructions,
-} from "./instructions.js";
+import { getAgentInstructions } from "./instructions.js";
 import { ContextManager } from "../ai/context/context-manager.js";
 import type { AgentInput } from "../ai/context/types.js";
 import { agentTools } from "./tools.js";
@@ -81,8 +78,9 @@ export async function runLanguageAgent(
   );
 
   // 1. Context management: check and enforce token budget before agent execution
+  const instructions = getAgentInstructions({ context });
   const contextResult = contextManager.prepare(input, {
-    instructions: LANGUAGE_TUTOR_INSTRUCTIONS,
+    instructions,
     userId: context.userId,
   });
 

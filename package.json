@@ -31,7 +31,8 @@
     "eval:level-assessment": "tsx evals/cli.ts --category level-assessment",
     "eval:security": "tsx evals/cli.ts --category security",
     "eval:context-budget": "tsx evals/cli.ts --category context-budget",
-    "eval:voice": "tsx evals/cli.ts --category voice"
+    "eval:voice": "tsx evals/cli.ts --category voice",
+    "eval:continuation": "tsx evals/cli.ts --category continuation"
   },
   "dependencies": {
     "@openai/agents": "^0.17.0",

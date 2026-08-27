@@ -1,0 +1,464 @@
+[
+  {
+    "id": "cont-001-open-ended",
+    "name": "Open-ended conversation prompt continues naturally",
+    "category": "continuation",
+    "input": "Tell me about your day as a language tutor.",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "B1"
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "continue_activity",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-002-grammar-explanation",
+    "name": "Grammar explanation provides definition and application task",
+    "category": "continuation",
+    "input": "Can you explain the Present Perfect tense?",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "A2"
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "continue_activity",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["Present Perfect"],
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-003-vocab-explanation",
+    "name": "Vocabulary explanation saves word and asks for example sentence",
+    "category": "continuation",
+    "input": "What does the word 'collateral' mean in business English?",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "B2"
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "continue_activity",
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "save_vocabulary",
+            "arguments": {
+              "word": "collateral"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "vocabulary_saved",
+          "details": {
+            "word": "collateral"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-004-active-exercise",
+    "name": "Active exercise loop continues to the next challenge",
+    "category": "continuation",
+    "input": "I borrowed a textbook from my friend yesterday.",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "B1"
+    },
+    "setup": {
+      "previousMessages": [
+        {
+          "role": "assistant",
+          "content": "Let's practice vocabulary! Please make a sentence using the verb 'borrow'."
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "borrow",
+          "lemma": "borrow",
+          "confidence": 0.5,
+          "status": "learning"
+        }
+      ]
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "continue_activity",
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "update_vocabulary_progress",
+            "arguments": {
+              "word": "borrow",
+              "isCorrect": true
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "vocabulary_progress_updated",
+          "details": {
+            "word": "borrow"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-005-topic-completion",
+    "name": "Topic completion transitions to next topic or structured options",
+    "category": "continuation",
+    "input": "I finished all the practice sentences for Past Simple. What should we do next?",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "A2"
+    },
+    "setup": {
+      "topics": [
+        {
+          "name": "Past Simple",
+          "type": "grammar",
+          "confidence": 0.9,
+          "status": "mastered"
+        }
+      ]
+    },
+    "expectsContinuation": true,
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-006-casual-conversation",
+    "name": "Casual conversation continues naturally without grammar lecture",
+    "category": "continuation",
+    "input": "I watched a fascinating documentary about marine biology yesterday.",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "B2"
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "continue_activity",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-007-user-says-goodbye",
+    "name": "User says goodbye concludes politely without forced questions",
+    "category": "continuation",
+    "input": "That's enough for today, thanks! See you tomorrow.",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "B1"
+    },
+    "expectsContinuation": false,
+    "expectedContinuationType": "natural_completion",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-008-explicit-completion",
+    "name": "Explicit completion is respected without pushing more tasks",
+    "category": "continuation",
+    "input": "I'm done practicing for now, thank you.",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "A2"
+    },
+    "expectsContinuation": false,
+    "expectedContinuationType": "natural_completion",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-009-user-asks-options",
+    "name": "User asks for practice options returns structured choices",
+    "category": "continuation",
+    "input": "What topics can we practice today?",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "B1"
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "offer_options",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-010-correction-continue",
+    "name": "Mistake correction records error and continues the topic",
+    "category": "continuation",
+    "input": "Yesterday I go to the cinema with my family.",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "A1"
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "continue_activity",
+    "expectations": {
+      "toolCalls": {
+        "required": [
+          {
+            "tool": "record_learning_mistake",
+            "arguments": {
+              "category": "grammar"
+            }
+          }
+        ]
+      },
+      "sideEffects": [
+        {
+          "type": "mistake_recorded",
+          "details": {
+            "category": "grammar"
+          }
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "containsSubstrings": ["went"],
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-011-voice-open-ended",
+    "name": "Voice message continues with voice modality and follow-up",
+    "category": "continuation",
+    "input": "I would love to practice conversational English about traveling abroad.",
+    "inputModality": "voice",
+    "user": {
+      "languageCode": "en",
+      "level": "B1"
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "continue_activity",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "voice"
+      }
+    }
+  },
+  {
+    "id": "cont-012-voice-explicit-text",
+    "name": "Voice input with explicit text request respects modality and continues",
+    "category": "continuation",
+    "input": "Explain how to use modal verbs in English, but please answer in writing.",
+    "inputModality": "voice",
+    "user": {
+      "languageCode": "en",
+      "level": "B1"
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "continue_activity",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-013-text-explicit-voice",
+    "name": "Text input with explicit voice request respects modality and continues",
+    "category": "continuation",
+    "input": "Can you give me some practical tips for practicing English speaking? Please reply with a voice message.",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "A2"
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "continue_activity",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "voice"
+      }
+    }
+  },
+  {
+    "id": "cont-014-generic-factual-answer",
+    "name": "Factual question answered and followed up with language learning check",
+    "category": "continuation",
+    "input": "Is English one of the official national languages of Switzerland?",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "B1"
+    },
+    "expectsContinuation": true,
+    "expectedContinuationType": "continue_activity",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-015-ambiguous-acknowledgement",
+    "name": "Ambiguous acknowledgement after explanation provides natural next step",
+    "category": "continuation",
+    "input": "Okay, got it.",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "B1"
+    },
+    "setup": {
+      "previousMessages": [
+        {
+          "role": "user",
+          "content": "What is the difference between 'for' and 'since'?"
+        },
+        {
+          "role": "assistant",
+          "content": "Use **for** with a period of time (e.g. for 2 hours) and **since** with a specific starting point (e.g. since 2020)."
+        }
+      ]
+    },
+    "expectsContinuation": true,
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  },
+  {
+    "id": "cont-016-negative-refusal",
+    "name": "User declines further practice ends without forced questions",
+    "category": "continuation",
+    "input": "No thanks, that's all I needed today. Bye!",
+    "inputModality": "text",
+    "user": {
+      "languageCode": "en",
+      "level": "B1"
+    },
+    "expectsContinuation": false,
+    "expectedContinuationType": "natural_completion",
+    "expectations": {
+      "sideEffects": [
+        {
+          "type": "no_write_mutations"
+        }
+      ],
+      "response": {
+        "nonEmpty": true,
+        "modality": "text"
+      }
+    }
+  }
+]

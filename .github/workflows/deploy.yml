@@ -8,11 +8,30 @@ on:
 
 jobs:
   # ----------------------------------------------------
-  # 1. CI: Typecheck & Production Build
+  # 1. CI: Typecheck, Production Build & Tests (Postgres service)
   # ----------------------------------------------------
   ci:
-    name: Typecheck & Build
+    name: Typecheck, Build & Test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: speakivo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/speakivo_test
+      # Dummy values: tests must never call real external APIs.
+      OPENAI_API_KEY: test-dummy-key
+      TELEGRAM_BOT_TOKEN: test-dummy-token
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,6 +50,15 @@ jobs:
 
       - name: Production Build
         run: npm run build
+
+      - name: Run database migrations
+        run: npm run db:migrate
+
+      - name: Seed database
+        run: npm run db:seed
+
+      - name: Run tests
+        run: npm test
 
   # ----------------------------------------------------
   # 2. CD: Automated Deployment to VPS srv-01 via SSH

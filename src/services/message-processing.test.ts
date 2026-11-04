@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
 import { db, queryClient } from "../db/client.js";
 import { users, conversationMessages, aiUsage } from "../db/schema/index.js";
-import { MessageProcessingService } from "./message-processing-service.js";
+import {
+  MessageProcessingService,
+  type LanguageAgentRunner,
+} from "./message-processing-service.js";
 import { userService } from "./user-service.js";
 import { learningService } from "./learning-service.js";
 import { conversationService } from "./conversation-service.js";
@@ -50,6 +53,16 @@ describe("MessageProcessingService — Text & Voice Pipeline with Response Modal
     },
   };
 
+  // Fake agent: unit tests must never call the real OpenAI API.
+  const mockAgent: LanguageAgentRunner = async (_input, context) => ({
+    response: "Mock tutor response.",
+    modality: context.requestedOutputModality ?? "text",
+    inputTokens: 10,
+    outputTokens: 5,
+    runId: "mock-run-id",
+    rawResponses: [],
+  });
+
   before(async () => {
     await db.delete(users).where(eq(users.telegramId, testTelegramId));
   });
@@ -75,6 +88,7 @@ describe("MessageProcessingService — Text & Voice Pipeline with Response Modal
       assessmentService,
       mockSTT,
       mockTTS,
+      mockAgent,
     );
 
     const result = await service.processTextMessage({
@@ -129,6 +143,7 @@ describe("MessageProcessingService — Text & Voice Pipeline with Response Modal
       assessmentService,
       mockSTT,
       mockTTS,
+      mockAgent,
     );
 
     const result = await service.processVoiceMessage({
@@ -195,6 +210,7 @@ describe("MessageProcessingService — Text & Voice Pipeline with Response Modal
       assessmentService,
       customSTT,
       mockTTS,
+      mockAgent,
     );
 
     const result = await service.processVoiceMessage({
@@ -218,6 +234,7 @@ describe("MessageProcessingService — Text & Voice Pipeline with Response Modal
       assessmentService,
       mockSTT,
       mockTTS,
+      mockAgent,
     );
 
     const result = await service.processTextMessage({
@@ -247,6 +264,7 @@ describe("MessageProcessingService — Text & Voice Pipeline with Response Modal
       assessmentService,
       mockSTT,
       failingTTS,
+      mockAgent,
     );
 
     const result = await service.processVoiceMessage({
@@ -281,6 +299,7 @@ describe("MessageProcessingService — Text & Voice Pipeline with Response Modal
       assessmentService,
       emptySTT,
       mockTTS,
+      mockAgent,
     );
 
     const result = await service.processVoiceMessage({
@@ -311,6 +330,7 @@ describe("MessageProcessingService — Text & Voice Pipeline with Response Modal
       assessmentService,
       brokenSTT,
       mockTTS,
+      mockAgent,
     );
 
     await assert.rejects(

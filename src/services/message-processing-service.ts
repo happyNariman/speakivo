@@ -75,6 +75,9 @@ function detectLanguageCode(text: string): string | null {
   return null;
 }
 
+/** Runs the language agent; injectable so tests can avoid real OpenAI calls. */
+export type LanguageAgentRunner = typeof runLanguageAgent;
+
 export class MessageProcessingService {
   constructor(
     private readonly userSvc: UserService = userService,
@@ -84,6 +87,7 @@ export class MessageProcessingService {
     private readonly assessSvc: AssessmentService = assessmentService,
     private readonly sttSvc: SpeechToTextService = speechToTextService,
     private readonly ttsSvc: TextToSpeechService = textToSpeechService,
+    private readonly runAgent: LanguageAgentRunner = runLanguageAgent,
   ) {}
 
   /**
@@ -512,7 +516,7 @@ export class MessageProcessingService {
     };
 
     // Execute Agent
-    const agentResult = await runLanguageAgent(historyItems, agentContext);
+    const agentResult = await this.runAgent(historyItems, agentContext);
 
     // Record Agent AI usage
     try {
